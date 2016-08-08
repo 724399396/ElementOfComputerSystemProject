@@ -17,4 +17,14 @@ CHIP DMux4Way {
 
     PARTS:
     // Put your code here:
+    And(a = sel[0], b = sel[1], out = df);
+    And(a = in, b = df, out = d);
+    Or(a = sel[0], b = sel[1], out = aft);
+    Not(in = aft, out = af);
+    And(a = in, b = af, out = a);
+    Xor(a = sel[0], b = sel[1], out = bcft);
+    And(a = bcft, b = sel[1], out = cf);
+    And(a = bcft, b = sel[0], out = bf);
+    And(a = in, b = bf, out = b);
+    And(a = in, b = cf, out = c);
 }
