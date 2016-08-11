@@ -28,7 +28,7 @@
 CHIP CPU {
 
     IN  inM[16],         // M value input  (M = contents of RAM[A])
-        instruction[16], // Instruction for execution
+        instruction[16], // Instruction for execution  xxxa cccc ccdd djjj
         reset;           // Signals whether to re-start the current
                          // program (reset==1) or continue executing
                          // the current program (reset==0).
@@ -40,4 +40,38 @@ CHIP CPU {
 
     PARTS:
     // Put your code here:
+    //Control
+    Mux16(a = aOut, b = inM, sel = instruction[3], out = daIN); // a 
+    Mux(a = false, b = true, sel = instruction[12], out = writeM); // writeM
+    
+    
+    // pc flag
+    And(a = instruction[13], b = ng, out = po1);
+    And(a = instruction[14], b = zr, out = po2);
+    Or(a = ng, b = zr, out = ngOzr);
+    Not(in = ngOzr, out = nNgOZr);
+    And(a = instruction[15], b = nNgOZr, out = po3);
+    And(a = instruction[13], b = instruction[14], out = a1314);
+    And(a = instruction[15], b = a1314, out = a131415);
+    Or(a = po1, b = po2, out = pof1);
+    Or(a = po3, b = a131415, out = pof2);
+    Or(a = pof1, b = pof2, out = pcLFlag);
+    Not(in = pcLFlag, out = nPcLFlag);
+
+    //PC
+    PC(in = aOut, reset = reset, load = pcLFlag, inc = nPcLFlag, out[0..14] = pc);
+
+    //A
+    Mux16(a[0..14] = instruction[0..14], a[15] = false, b = aluOut, sel = instruction[0], out = aMOut);
+    Mux(a = true, b = instruction[10], sel = instruction[0], out = setAFlag);
+    ARegister(in = aMOut, load = setAFlag, out = aOut, out[0..14] = addressM);
+    
+    //D
+    DRegister(in = aluOut, load = instruction[11], out = dOut);
+
+   //ALU
+   ALU(x = dOut, y = daIN,zx=instruction[4],nx=instruction[5],zy=instruction[6],ny=instruction[7],f= instruction[8],no= instruction[9],out= outM, out = aluOut, zr = zr, ng = ng) ;
+
+   
+   
 }
