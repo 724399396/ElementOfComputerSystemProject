@@ -114,6 +114,32 @@ def writeArithmetic(command: String): Unit = {
   out.print(assembly.split("\n").map(_.trim).mkString("\n"))
 }
 
+def pop2(index: Int, reg: String): String =
+  s"""@$index
+           D=A
+           @$reg
+           D=M+D
+           @SP
+           M=M-1
+           @SP
+           A=M
+           D=M   
+           """
+
+def push2(index: Int, reg: String): String =
+  s"""@$index
+           D=A
+           @$reg
+           D=M+D
+           A=D
+           D=M
+           @SP
+           A=M
+           M=D
+           @SP
+           M=M+1
+           """
+
 def writePushPop(command: String, segment: String, index: Int): Unit = {
   val assembly = command match {
     case "push" =>
@@ -122,6 +148,28 @@ def writePushPop(command: String, segment: String, index: Int): Unit = {
           s"""@$index
              D=A
 """ + pushD()
+        case "local" => push2(index, "LCL")
+        case "argument" =>
+          push2(index, "ARG")
+        case "this" =>
+          push2(index, "THIS")
+        case "that" =>
+          push2(index, "THAT")
+        case "temp" =>
+          push2(index, "R5")
+      }
+    case "pop" =>
+      segment match {
+        case "local" =>
+          pop2(index, "LCL")
+        case "argument" =>
+          pop2(index, "ARG")
+        case "this" =>
+          pop2(index, "THIS")
+        case "that" =>
+          pop2(index, "THAT")
+        case "temp" =>
+          pop2(index, "R5")
       }
   }
   out.print(assembly.split("\n").map(_.trim).mkString("\n"))
