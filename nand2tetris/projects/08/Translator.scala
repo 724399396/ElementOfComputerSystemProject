@@ -1,11 +1,11 @@
-object Main extends App {
+//object Main extends App {
   import scala.io.Source
 
   sealed trait CommandType
   case object Arithemetic extends CommandType
   case object Push extends CommandType
   case object Pop extends CommandType
-  case object Lable extends CommandType
+  case object Label extends CommandType
   case object Goto extends CommandType
   case object If extends CommandType
   case object Function extends CommandType
@@ -47,7 +47,7 @@ object Main extends App {
     else currentCommand match {
       case x if x.startsWith("pop") => Pop
       case x if x.startsWith("push") => Push
-      case x if x.startsWith("lable") => Lable
+      case x if x.startsWith("label") => Label
       case x if x.startsWith("goto") => Goto
       case x if x.startsWith("if-goto") => If
       case x if x.startsWith("function") => Function
@@ -234,26 +234,28 @@ D=!A
        D=A
        @SP
        M=D
-       xx call Sys.init
-    """
+    """ + writeCall("Sys.init", 0)
     splitWrite(str)
   }
 
-  def writeLable(label: String): Unit = {
-    splitWrite(s"($label)\n")
+  def writeLabel(label: String): Unit = {
+    out.print(s"($label)\n")
   }
 
   def writeGoto(label: String): Unit = {
-    val assembly = """@$lable
+    val assembly = s"""@$label
                    0;JMP
                    """
     splitWrite(assembly)
   }
 
   def writeIf(label: String): Unit = {
-    val assembly = """@SP
+    val assembly = s"""@SP
+                   M=M-1
+                   @SP
+                   A=M
                    D=M
-                   @$lable
+                   @$label
                    D;JGT
                    """
     splitWrite(assembly)
@@ -288,51 +290,61 @@ D=!A
                    @LCL
                    M=D
                    """ + writeGoto(functionName) +
-                   """(${functionName}returnAddress)
+      """(${functionName}returnAddress)
                    """
     splitWrite(assembly)
   }
 
   def writeReturn(): Unit = {
-     val assembly = s"""@LCL
+    val assembly = s"""@LCL
                    D=M
                    @14
                    M=D
                    @5
                    D=D-A
+                   A=D
+                   D=M
                    @13
                    M=D
                    $pop2M
                    D=M
                    @ARG
+                   A=M
                    M=D
-                   D=A+1
+                   @ARG
+                   D=M+1
                    @SP
                    M=D
-                   @14
-                   D=M
                    @1
-                   D=M-A
+                   D=A
+                   @14                   
+                   D=M-D
+                   A=D
+                   D=M
                    @THAT
                    M=D
-                   @THIS
-                   @14
-                   D=M
                    @2
-                   D=M-A
+                     D=A
+                   @14
+                   D=M-D
+                   A=D
+                   D=M
                    @THIS
                    M=D
-@14
-                   D=M
                    @3
-                   D=M-A
+                     D=A
+                   @14
+                   D=M-D
+                   A=D
+                   D=M
                    @ARG
                    M=D
-                   @THIS
-                   @14
-                   D=M
                    @4
-                   D=M-A
+                  D=A
+                   @14
+                   D=M-D
+                   A=D
+                   D=M
                    @LCL
                    M=D
                    @13
@@ -343,12 +355,14 @@ D=!A
   }
 
   def writeFunction(functionName: String, numLocals: Int): Unit = {
-    val asemmbly = """($functionName)
-                   """ + (0 until numLocals).map("@0\nD=A\n" + pushD()).mkString("\n")
+    val asemmbly = s"""($functionName)
+                   """ + (0 until numLocals).map(_ => "\n@0\nD=A\n" + pushD()).mkString("\n") + "\n"
+    splitWrite(asemmbly)
   }
 
   while (hasMoreCommands()) {
     var f = ""
+    out.println("//" + ignoreBlankAndComment(currentLoc))
     commandType() match {
       case Arithemetic =>
         writeArithmetic(arg1)
@@ -356,8 +370,8 @@ D=!A
         writePushPop("pop", arg1, arg2)
       case Push =>
         writePushPop("push", arg1, arg2)
-      case Lable =>
-        writeLable(f + "$" + arg1)
+      case Label =>
+        writeLabel(f + "$" + arg1)
       case Goto =>
         writeGoto(f + "$" + arg1)
       case If =>
@@ -374,4 +388,4 @@ D=!A
   }
 
   out.close
-}
+//}
