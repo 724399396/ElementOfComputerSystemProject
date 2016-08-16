@@ -1,5 +1,4 @@
 import scala.io.Source
-// dest=comp;jump
 
 sealed trait CommandType
 case object Arithemetic extends CommandType
@@ -114,24 +113,41 @@ def writeArithmetic(command: String): Unit = {
   out.print(assembly.split("\n").map(_.trim).mkString("\n"))
 }
 
-def pop2(index: Int, reg: String): String =
+def pop2a(index: Int, reg: String): String =
   s"""@$index
            D=A
            @$reg
            D=M+D
+           @R15
+           M=D
            @SP
-           M=M-1
-           @SP
+           AM=M-1
+           D=M
+           @15
            A=M
-           D=M   
+           M=D
            """
 
-def push2(index: Int, reg: String): String =
+def pop2b(index: Int, reg: String): String =
   s"""@$index
            D=A
            @$reg
-           D=M+D
-           A=D
+           D=A+D
+           @R15
+           M=D
+           @SP
+           AM=M-1
+           D=M
+           @15
+           A=M
+           M=D
+           """
+
+def push2a(index: Int, reg: String): String =
+  s"""@$index
+           D=A
+           @$reg
+           A=M+D
            D=M
            @SP
            A=M
@@ -139,6 +155,20 @@ def push2(index: Int, reg: String): String =
            @SP
            M=M+1
            """
+
+def push2b(index: Int, reg: String): String = 
+    s"""@$index
+           D=A
+           @$reg
+           A=A+D
+           D=M
+           @SP
+           A=M
+           M=D
+           @SP
+           M=M+1
+           """
+
 
 def writePushPop(command: String, segment: String, index: Int): Unit = {
   val assembly = command match {
@@ -148,28 +178,36 @@ def writePushPop(command: String, segment: String, index: Int): Unit = {
           s"""@$index
              D=A
 """ + pushD()
-        case "local" => push2(index, "LCL")
+        case "local" => push2a(index, "LCL")
         case "argument" =>
-          push2(index, "ARG")
+          push2a(index, "ARG")
         case "this" =>
-          push2(index, "THIS")
+          push2a(index, "THIS")
         case "that" =>
-          push2(index, "THAT")
+          push2a(index, "THAT")
         case "temp" =>
-          push2(index, "R5")
+          push2b(index, "R5")
+        case "pointer" =>
+          push2b(index, "THIS")
+        case "static" =>
+          push2b(index, "16")
       }
     case "pop" =>
       segment match {
         case "local" =>
-          pop2(index, "LCL")
+          pop2a(index, "LCL")
         case "argument" =>
-          pop2(index, "ARG")
+          pop2a(index, "ARG")
         case "this" =>
-          pop2(index, "THIS")
+          pop2a(index, "THIS")
         case "that" =>
-          pop2(index, "THAT")
+          pop2a(index, "THAT")
         case "temp" =>
-          pop2(index, "R5")
+          pop2b(index, "R5")
+        case "pointer" =>
+          pop2b(index, "THIS")
+        case "static" =>
+          pop2b(index, "16")
       }
   }
   out.print(assembly.split("\n").map(_.trim).mkString("\n"))
