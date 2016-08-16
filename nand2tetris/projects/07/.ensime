@@ -1,8 +1,8 @@
 (
- :root-dir "/home/work/learning/computer_system/nand2tetris/projects/06/my_assembler"
- :cache-dir "/home/work/learning/computer_system/nand2tetris/projects/06/my_assembler/.ensime_cache"
+ :root-dir "/home/work/learning/computer_system/nand2tetris/projects/07"
+ :cache-dir "/home/work/learning/computer_system/nand2tetris/projects/07/.ensime_cache"
  :scala-compiler-jars ("/home/weili/.sbt/boot/scala-2.10.6/lib/scala-compiler.jar" "/home/weili/.sbt/boot/scala-2.10.6/lib/scala-library.jar" "/home/weili/.sbt/boot/scala-2.10.6/lib/scala-reflect.jar" "/home/weili/.ivy2/cache/org.scala-lang/scalap/jars/scalap-2.10.6.jar")
- :name "my_assembler"
+ :name "root-07"
  :java-home "/home/q/jdk1.8.0_65"
  :java-flags ("-Xss2m" "-Xms1024m" "-Xmx1024m" "-XX:ReservedCodeCacheSize=128m" "-XX:MaxMetaspaceSize=256m")
  :java-compiler-args nil
@@ -13,14 +13,14 @@
  :disable-source-monitoring nil
  :disable-class-monitoring nil
  :subprojects ((
-   :name "my_assembler"
+   :name "root-07"
    :source-roots nil
-   :targets ("/home/work/learning/computer_system/nand2tetris/projects/06/my_assembler/target/scala-2.10/classes")
-   :test-targets ("/home/work/learning/computer_system/nand2tetris/projects/06/my_assembler/target/scala-2.10/test-classes")
+   :targets ("/home/work/learning/computer_system/nand2tetris/projects/07/target/scala-2.10/classes")
+   :test-targets ("/home/work/learning/computer_system/nand2tetris/projects/07/target/scala-2.10/test-classes")
    :depends-on-modules nil
    :compile-deps ("/home/weili/.sbt/boot/scala-2.10.6/lib/scala-library.jar")
    :runtime-deps nil
    :test-deps nil
-   :doc-jars ("/home/work/learning/computer_system/nand2tetris/projects/06/my_assembler/target/scala-2.10/my_assembler_2.10-0.1-SNAPSHOT-javadoc.jar" "/home/weili/.ivy2/cache/org.scala-lang/scala-library/docs/scala-library-2.10.6-javadoc.jar")
+   :doc-jars ("/home/work/learning/computer_system/nand2tetris/projects/07/target/scala-2.10/root-07_2.10-0.1-SNAPSHOT-javadoc.jar" "/home/weili/.ivy2/cache/org.scala-lang/scala-library/docs/scala-library-2.10.6-javadoc.jar")
    :reference-source-roots ("/home/weili/.ivy2/cache/org.scala-lang/scala-library/srcs/scala-library-2.10.6-sources.jar")))
 )

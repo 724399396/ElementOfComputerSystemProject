@@ -21,7 +21,7 @@ val ignoreBlankAndComment = con.foldLeft((List[String](), false)) {
       else if (x.startsWith("/*"))
         (acc, true)
       else
-        (acc ++ List(x.filterNot(_ == ' ')), comment)
+        (acc ++ List(x.filterNot(_ == ' ').takeWhile(_ != '/')), comment)
     }
 }._1
 
@@ -81,7 +81,11 @@ def dest(): String = {
 def comp(): String = {
   commandType match {
     case CCommand =>
-      ignoreBlankAndComment(currentLoc).dropWhile(_ != '=').drop(1).takeWhile(_ != ';')
+      val command = ignoreBlankAndComment(currentLoc)
+      if (command.contains("="))
+        command.dropWhile(_ != '=').drop(1).takeWhile(_ != ';')
+      else
+        command.takeWhile(_ != ';')
     case _ =>
       throw new Error("illegal symbol operation")
   }
@@ -97,7 +101,7 @@ def jump(): String = {
   }
 }
 
-def dest(menemonic: String): String = {
+def deDest(menemonic: String): String = {
   menemonic.filterNot(_ == ' ').toUpperCase match {
     case "NULL" => "000"
     case "M" => "001"
@@ -110,7 +114,7 @@ def dest(menemonic: String): String = {
   }
 }
 
-def jump(menemonic: String): String = {
+def deJump(menemonic: String): String = {
   menemonic.filterNot(_ == ' ').toUpperCase match {
     case "NULL" => "000"
     case "JGT" => "001"
@@ -118,12 +122,12 @@ def jump(menemonic: String): String = {
     case "JGE" => "011"
     case "JLT" => "100"
     case "JNE" => "101"
-    case "NLE" => "110"
+    case "JLE" => "110"
     case "JMP" => "111"
   }
 }
 
-def comp(menemonic: String): String = {
+def deComp(menemonic: String): String = {
   menemonic.filterNot(_ == ' ').toUpperCase match {
     case "0" => "0101010"
     case "1" => "0111111"
@@ -156,10 +160,6 @@ def comp(menemonic: String): String = {
   }
 }
 
-def symbolTransfer(s: String): String = {
-  intTo15HexString(s.toInt)
-}
-
 def intTo15HexString(i: Int): String = {
   var res: String = ""
   var num: Int = i
@@ -171,28 +171,73 @@ def intTo15HexString(i: Int): String = {
   (0 until 15).map(_ => "0").drop(res.length).mkString("") + res
 }
 
+var variableLoc = 15
+
+def symbolTransfer(s: String): String = {
+  if (contains(s))
+    intTo15HexString(getAddress(s))
+  else {
+    if (s.forall(_.isDigit))
+      intTo15HexString(s.toInt)
+    else {
+      variableLoc += 1
+      addEntry(s, variableLoc)
+      intTo15HexString(variableLoc)
+    }  
+  }
+}
+
+var commandLine = 0
 for ( i <-  0 until totalLength) {
   currentLoc = i
   commandType() match {
     case LCommand =>
-
+      addEntry(symbol(), commandLine)
     case _ =>
+      commandLine += 1
   }
 }
 
+addEntry("SP", 0)
+addEntry("LCL", 1)
+addEntry("ARG", 2)
+addEntry("THIS", 3)
+addEntry("THAT", 4)
+addEntry("R0", 0)
+addEntry("R1", 1)
+addEntry("R2", 2)
+addEntry("R3", 3)
+addEntry("R4", 4)
+addEntry("R5", 5)
+addEntry("R6", 6)
+addEntry("R7", 7)
+addEntry("R8", 8)
+addEntry("R9", 9)
+addEntry("R10", 10)
+addEntry("R11", 11)
+addEntry("R12", 12)
+addEntry("R13", 13)
+addEntry("R14", 14)
+addEntry("R15", 15)
+addEntry("SCREEN", 16384)
+addEntry("KBD", 23576)
+
+currentLoc = 0
 
 val out = new java.io.PrintWriter(args(0).takeWhile(_ != '.') + "1.hack")
+
+//println(ignoreBlankAndComment)
 
 while (hasMoreCommands()) {
   val line = commandType() match {
     case ACommand =>
       "0" + symbolTransfer(symbol()) + "\n"
     case CCommand =>
-      "111" + comp(comp()) + dest(dest())  + jump(jump()) + "\n"
+      "111" + deComp(comp) + deDest(dest)  + deJump(jump) + "\n"
     case LCommand => ""
   }
-  println(ignoreBlankAndComment(currentLoc))
-  print(line)
+  //println(ignoreBlankAndComment(currentLoc))
+//  print(line)
   out.print(line)
   advance()
 }
