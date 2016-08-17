@@ -12,9 +12,9 @@
   case object Return extends CommandType
   case object Call extends CommandType
 
-  val con = Source.fromFile(args(0)).getLines.toList
+  val file = new java.io.File(args(0))
 
-  val ignoreBlankAndComment = con.foldLeft((List[String](), false)) {
+   def ignoreComment(str: List[String]): List[String] = str.foldLeft((List[String](), false)) {
     case ((acc, comment), x) =>
       if (comment) {
         if (!x.contains("*/"))
@@ -27,9 +27,25 @@
         else if (x.startsWith("/*"))
           (acc, true)
         else
-          (acc ++ List(x), comment)
+          (acc ++ List(x.takeWhile(_ != '/').trim), comment)
       }
   }._1
+
+  val con: List[String] = if (file.isDirectory()) file.listFiles.filter(_.getName.endsWith(".vm")).toList.flatMap(x => Source.fromFile(x).getLines.toList) else Source.fromFile(file).getLines.toList
+
+  val staticMap: Map[Int, String] = if (file.isDirectory()) file.listFiles.filter(_.getName.endsWith(".vm")).toList.foldLeft(0, Map[Int, String]()) {
+    case ((r, acc), x) => {
+      val size = ignoreComment(Source.fromFile(x).getLines.toList).size
+      val map = (r until r + size).toList.map(y => y -> x.getName).toMap
+      (r + size, acc ++ map)
+    }
+  }._2
+  else {
+    val size = ignoreComment(Source.fromFile(file).getLines.toList).size
+    (0 until size).toList.map(y => y -> file.getName).toMap
+  }
+
+  val ignoreBlankAndComment = ignoreComment(con) 
 
   val totalLength = ignoreBlankAndComment.size
 
@@ -69,7 +85,7 @@
     currentCommand.split("\\s+").apply(2).toInt
   }
 
-  val out = new java.io.PrintWriter(args(0).takeWhile(_ != '.') + ".asm")
+  val out = if (file.isDirectory) new java.io.PrintWriter(args(0) + "/" + file.getName + ".asm") else new java.io.PrintWriter(args(0).takeWhile(_ != '.') + ".asm")
 
   def pop2M() =
     """@SP
@@ -202,7 +218,7 @@ D=!A
           case "pointer" =>
             push2b(index, "THIS")
           case "static" =>
-            push2b(index, "16")
+            push2b(0, staticMap(currentLoc) + index)
         }
       case "pop" =>
         segment match {
@@ -219,7 +235,7 @@ D=!A
           case "pointer" =>
             pop2b(index, "THIS")
           case "static" =>
-            pop2b(index, "16")
+            pop2b(0, staticMap(currentLoc) + index)
         }
     }
     out.print(assembly.split("\n").map(_.trim).mkString("\n"))
@@ -227,15 +243,6 @@ D=!A
 
   def splitWrite(str: String) = {
     out.print(str.split("\n").map(_.trim).mkString("\n"))
-  }
-
-  def writeInit(): Unit = {
-    val str = """@256
-       D=A
-       @SP
-       M=D
-    """ + writeCall("Sys.init", 0)
-    splitWrite(str)
   }
 
   def writeLabel(label: String): Unit = {
@@ -256,13 +263,16 @@ D=!A
                    A=M
                    D=M
                    @$label
-                   D;JGT
+                   D;JLT
                    """
     splitWrite(assembly)
   }
 
+  var funcPc = 0
+
   def writeCall(functionName: String, numArgs: Int): Unit = {
-    val assembly = s"""@${functionName}returnAddress
+    funcPc += 1
+    val assembly = s"""@${functionName}returnAddress$funcPc
                    D=A
                    $pushD
                    @LCL
@@ -282,17 +292,18 @@ D=!A
                    @$numArgs
                    D=D-A
                    @5
-                   D=D-5
+                   D=D-A
                    @ARG
                    M=D
                    @SP
                    D=M
                    @LCL
                    M=D
-                   """ + writeGoto(functionName) +
-      """(${functionName}returnAddress)
                    """
     splitWrite(assembly)
+    writeGoto(functionName)
+    splitWrite(s"""(${functionName}returnAddress$funcPc)
+                   """)
   }
 
   def writeReturn(): Unit = {
@@ -360,8 +371,21 @@ D=!A
     splitWrite(asemmbly)
   }
 
+  def writeInit(): Unit = {
+    val str = """@256
+       D=A
+       @SP
+       M=D
+    """
+    splitWrite(str)
+    writeCall("Sys.init", 0)
+  }
+
+  if (args(1) == "init") {
+    writeInit()
+  }
+  var f = ""
   while (hasMoreCommands()) {
-    var f = ""
     out.println("//" + ignoreBlankAndComment(currentLoc))
     commandType() match {
       case Arithemetic =>
