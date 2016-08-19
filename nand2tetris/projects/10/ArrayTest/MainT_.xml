@@ -124,6 +124,10 @@
 <identifier>printInt</identifier>
 <symbol>(</symbol>
 <identifier>sum</identifier>
+<symbol>/</symbol>
+<identifier>length</identifier>
+<symbol>)</symbol>
+<symbol>;</symbol>
 <keyword>do</keyword>
 <identifier>Output</identifier>
 <symbol>.</symbol>

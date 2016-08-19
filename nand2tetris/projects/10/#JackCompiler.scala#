@@ -8,9 +8,10 @@ object JackAnalyzer {
     else Array(inFile)
 
     for (file <- files) {
-      
+
       JackTokennizer.run(file)
-      CompilationEngine.recursiveDescentParser(JackTokennizer.tokennizer(file));
+      //val out = new File(file.getParentFile(), file.getName.takeWhile(_ != '.') + "_.xml")
+      //CompilationEngine.recursiveDescentParser(JackTokennizer.tokennizer(file), out);
     }
   }
 }
