@@ -362,26 +362,146 @@ object CompilationEngine {
   }
 
   def compileWhile(str: List[String]): (String, List[String]) = {
-    ("", str)
+    str match {
+      case "while" :: "(" :: xs =>
+        val (res1, left1) = compileExpression(xs)
+        left1 match {
+          case ")" :: "{" :: ys =>
+            val (res2, left2) = compileStatements(ys)
+            left2 match {
+              case "}" :: zs =>
+                ("<whileStatement>" + help("while") + help("(") +
+                  res1 + help(")") + help("{") + res2 + help("}") +
+                  "</whileStatement>", zs)
+            }
+        }
+    }
   }
 
   def compileReturn(str: List[String]): (String, List[String]) = {
-    ("", str)
+    str match {
+      case "return" :: ";" :: xs =>
+        ("<returnStatement>" + help("return") + help(";") + "</returnStatement>", xs)
+      case "return" :: xs =>
+        val (res, left) = compileExpression(xs)
+        left match {
+          case ";" :: ys =>
+            ("<returnStatement>" + help("return") + res + help(";") + "</returnStatement>", ys)
+        }
+    }
   }
 
   def compileIf(str: List[String]): (String, List[String]) = {
-    ("", str)
+    str match {
+      case "if" :: "(" :: xs =>
+        val (res1, left1) = compileExpression(xs)
+        left1 match {
+          case ")" :: "{" :: ys =>
+            val (res2, left2) = compileStatements(ys)
+            left2 match {
+              case "}" :: "else" :: "{" :: zs =>
+                val (res3, left3) = compileStatements(zs)
+                left3 match {
+                  case "}" :: ks =>
+                    ("<ifStatement>" + help("if") + help("(") + res1 + help(")") + help("{") + res2 + help("}") + help("else") + help("{") + res3 + help("}") +
+                      "</ifStatement>", ks)
+              case "}" :: zs =>
+                    ("<ifStatement>" + help("if") + help("(") + res1 + help(")") + help("{") + res2 + help("}")  + "</ifStatement>", zs)
+            }
+        }
+    }
+  }
+
+  def opProcess(str: List[String]): (String, List[String]) = {
+    val set = Set("+", "-", "*", "/", "&", "|", "<", ">", "=")
+    str match {
+      case x :: xs if set.contains(x) =>
+        val (res, left) = compileTerm(xs)
+        val (res2, left2) = opProcess(left)
+        (help(x) + res2, left2)
+      case x =>
+        ("", x)
+    }
   }
 
   def compileExpression(str: List[String]): (String, List[String]) = {
-    ("", str)
+    val (res1, left1) = compileTerm(str)
+    val (res2, left2) = onProcess(left1)
+    ("<expression>" + res + res2 + "</expression>", left2)
   }
 
   def compileTerm(str: List[String]): (String, List[String]) = {
-    ("", str)
+    val (res, left) = str match {
+      case x :: xs =>
+        JackTokennizer.tokenType(x) match {
+          case JackTokennizer.IntegerConstant =>
+            (help(x),xs)
+          case JackTokennizer.StringConstant =>
+            (help(x),xs)
+          case JackTokennizer.Keyword =>
+            (help(x),xs)
+          case JackTokennizer.Identifier =>
+            xs match {
+              case "[" :: ys =>
+                val (res1, left1) = compileExpression(ys)
+                left1 match {
+                  case "]" :: zs =>
+                    (help(x) + help("[") + res1 + help("]"), zs)
+                }
+              case "(" :: ys =>
+                compileSubroutineCall(str)
+              case ys =>
+                (help(x),xs)
+            }
+          case JackTokennizer.Symbol =>
+           str match {
+             case "(" :: ys =>
+               val (res1, left1) = compileExpression(ys)
+               left1 match {
+                 case ")" :: zs =>
+                   (help("(") + res1 + help(")"), zs)
+               }
+             case "+" :: ys =>
+               val (res1, left1) = compileTerm(ys)
+               (help("+") + res1, left1)
+           }
+        }
+    }
+    ("<term>" + res + "</term>", left)
+  }
+
+  def compileSubroutineCall(str: List[String]): (String, List[String]) = {
+    str match {
+    case n1 :: "." :: n2 :: "(" :: xs =>
+        val (res1, left1) = compileExpressionList(xs)
+        left1 match {
+          case ")" :: ys =>
+            ("<subroutineCall>" + help(n1) + help(".") + help(n2) + help("(") + res1 + help(")") + "</subroutineCall>", ys)
+        }
+      case n :: "(" :: xs =>
+        val (res1, left1) = compileExpressionList(xs)
+ p      left1 match {
+          case ")" :: ys =>
+            ("<subroutineCall>" + help(n) + help("(") + res1 + help(")") + "</subroutineCall>", ys)
+}
+  }
+
+  def exComma(str: List[String]): (String, List[String]) = {
+    str match {
+      case "," :: xs =>
+        val (res1, left1) = compileExpression(xs)
+        val (res2, left2) = exComma(left1)
+        (help(",") + res1 + res2, left2)
+    }
   }
 
   def compileExpressionList(str: List[String]): (String, List[String]) = {
-    ("", str)
+    str match {
+      case Nil => ("", Nil)
+      case x =>
+        val (res1, left1) = compileExpression(x)
+        val (res2, left2) = exComma(left1)
+        ("<expressionList>" + res1 + res2 + "</expressionList>", left2)
+    }
   }
 }
