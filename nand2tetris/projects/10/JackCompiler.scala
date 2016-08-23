@@ -216,7 +216,7 @@ object CompilationEngine {
         val (res2, left2) = compileSubroutine(left1)
         left2 match {
           case "}" :: left =>
-            ("<class>" + help("class") + help(x) + help("{") + res1 + res2 + help("}") + "</class>", left)
+            ("<class>" + help("</class>") + help(x) + help("{") + res1 + res2 + help("}") + "</class>", left)
         }
     }
   }
@@ -234,10 +234,10 @@ object CompilationEngine {
     str match {
       case "static" :: x :: y :: xs =>
         val (c, left) = commaProcess(xs)
-        (help("static") + help(x) + help(y) + c, left)
+        (help("<classVarDec>") + help("static") + help(x) + help(y) + c + help("</classVarDec>"), left)
       case "field" :: x :: y :: xs =>
         val (c, left) = commaProcess(xs)
-        (help("static") + help(x) + help(y) + c, left)
+        (help("<classVarDec>") + help("static") + help(x) + help(y) + c + help("</classVarDec>"), left)
       case x => ("", x)
     }
   }
@@ -310,13 +310,14 @@ object CompilationEngine {
       case "return" :: xs =>
         compileReturn(str)
     }
-    left1 match {
+    val (res, left) = left1 match {
       case "}" :: xs =>
         (res1, left1)
       case ys =>
         val (res2, left2) = compileStatements(ys)
         (res1 + res2, left2)
     }
+    (help("<statements>") + res + help("</statements>"), left)
   }
 
   def compileDo(str: List[String]): (String, List[String]) = {
