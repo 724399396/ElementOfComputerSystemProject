@@ -206,7 +206,22 @@ object CompilationEngine {
 
   def help(s: String): String = {
     val t = JackTokennizer.tokenType(s)
-    s"<${t.toString.head.toLower + t.toString.tail}>$s</${t.toString.head.toLower + t.toString.tail}>"
+    s"<${t.toString.head.toLower + t.toString.tail}>${change(s, t)}</${t.toString.head.toLower + t.toString.tail}>\n"
+  }
+
+  def change(s: String, t: JackTokennizer.TokenType): String = {
+    t match {
+      case JackTokennizer.StringConstant => s.drop(1).dropRight(1)
+      case JackTokennizer.Symbol =>
+        s.head match {
+          case '<' => "&lt;"
+          case '>' => "&gt;"
+          case '"' => "&quot;"
+          case '&' => "&amp;"
+          case x => x.toString
+        }
+      case _ => s
+    }
   }
 
   def compileClass(str: List[String]): (String, List[String]) = {
@@ -216,7 +231,7 @@ object CompilationEngine {
         val (res2, left2) = compileSubroutine(left1)
         left2 match {
           case "}" :: left =>
-            ("<class>" + help("</class>") + help(x) + help("{") + res1 + res2 + help("}") + "</class>", left)
+            ("<class>\n" + help("class") + help(x) + help("{") + res1 + res2 + help("}") + "</class>", left)
         }
     }
   }
@@ -234,10 +249,10 @@ object CompilationEngine {
     str match {
       case "static" :: x :: y :: xs =>
         val (c, left) = commaProcess(xs)
-        (help("<classVarDec>") + help("static") + help(x) + help(y) + c + help("</classVarDec>"), left)
+        ("<classVarDec>" + help("static") + help(x) + help(y) + c + "</classVarDec>\n", left)
       case "field" :: x :: y :: xs =>
         val (c, left) = commaProcess(xs)
-        (help("<classVarDec>") + help("static") + help(x) + help(y) + c + help("</classVarDec>"), left)
+        (("<classVarDec>") + help("static") + help(x) + help(y) + c + ("</classVarDec>\n"), left)
       case x => ("", x)
     }
   }
@@ -250,7 +265,7 @@ object CompilationEngine {
         left1 match {
           case ")" :: ys =>
             val (res2, left2) = compileSubroutineBody(ys)
-            ("<subroutineDec>" + help(x) + help(t) + help(n) + help("(") + res1 + help(")") + res2 + "</subroutineDec>", left2)
+            ("<subroutineDec>\n" + help(x) + help(t) + help(n) + help("(") + res1 + help(")") + res2 + "</subroutineDec>\n", left2)
         }
       case x => ("", x)
     }
@@ -263,7 +278,7 @@ object CompilationEngine {
         val (res3, left3) = compileStatements(left2)
         left3 match {
           case "}" :: left =>
-            ("<subroutineBody>" + help("{") + res2 + res3 + help("}") + "</subroutineBody>", left)
+            ("<subroutineBody>\n" + help("{") + res2 + res3 + help("}") + "</subroutineBody>\n", left)
         }
     }
   }
@@ -276,7 +291,7 @@ object CompilationEngine {
       case x =>
         ("", x)
     }
-    ("<parameterList>" + res + "</parameterList>", left)
+    ("<parameterList>\n" + res + "</parameterList>\n", left)
   }
 
   def compileVarDec(str: List[String]): (String, List[String]) = {
@@ -290,14 +305,14 @@ object CompilationEngine {
                 compileVarDec(y :: ys)
               else
                 ("", y :: ys)
-            ("<varDec>" + help("var") + help(t) + help(x) + res + help(";") + "</varDec>" + res2, left2)
+            ("<varDec>\n" + help("var") + help(t) + help(x) + res + help(";") + "</varDec>\n" + res2, left2)
         }
       case x =>
         ("", x)
     }
   }
 
-  def compileStatements(str: List[String]): (String, List[String]) = {
+  def compileStatements(str: List[String], firstIn: Boolean = true): (String, List[String]) = {
     val (res1, left1) = str match {
       case "let" :: xs =>
         compileLet(str)
@@ -314,27 +329,27 @@ object CompilationEngine {
       case "}" :: xs =>
         (res1, left1)
       case ys =>
-        val (res2, left2) = compileStatements(ys)
+        val (res2, left2) = compileStatements(ys, false)
         (res1 + res2, left2)
     }
-    (help("<statements>") + res + help("</statements>"), left)
+    (if (firstIn) ("<statements>\n") + res + ("</statements>\n") else res, left)
   }
 
   def compileDo(str: List[String]): (String, List[String]) = {
     str match {
-       case "do" :: n1 :: "." :: n2 :: "(" :: xs =>
+      case "do" :: n1 :: "." :: n2 :: "(" :: xs =>
         val (res1, left1) = compileExpressionList(xs)
         left1 match {
-          case ")" :: ys =>
-            ("<doStatement>" + help("do") + help(n1) + help(".") + help(n2) + help("(") + res1 + help(")") + "</doStatement>", ys)
+          case ")" :: ";" :: ys =>
+            ("<doStatement>\n" + help("do") + help(n1) + help(".") + help(n2) + help("(") + res1 + help(")") + help(";") + "</doStatement>\n", ys)
         }
       case "do" :: n :: "(" :: xs =>
         val (res1, left1) = compileExpressionList(xs)
         left1 match {
-          case ")" :: ys =>
-            ("<doStatement>" + help("do") + help(n) + help("(") + res1 + help(")") + "</doStatement>", ys)
+          case ")" :: ";" :: ys =>
+            ("<doStatement>\n" + help("do") + help(n) + help("(") + res1 + help(")") + help(";") + "</doStatement>\n", ys)
         }
-     
+
       case x => ("", x)
     }
   }
@@ -349,14 +364,14 @@ object CompilationEngine {
             val (res2, left2) = compileExpression(ys)
             left2 match {
               case ";" :: zs =>
-                 ("<letStatement>" + help("let") + help(n) + help("[") + res1 + help("]") + help("=") + res2 + help(";") + "</letStatement>", zs)
+                ("<letStatement>\n" + help("let") + help(n) + help("[") + res1 + help("]") + help("=") + res2 + help(";") + "</letStatement>\n", zs)
             }
         }
       case "let" :: n :: "=" :: xs =>
         val (res1, left1) = compileExpression(xs)
         left1 match {
           case ";" :: ys =>
-            ("<letStatement>" + help("let") + help(n) + help("=") + res1 + help(";") + "</letStatement>", ys)
+            ("<letStatement>\n" + help("let") + help(n) + help("=") + res1 + help(";") + "</letStatement>\n", ys)
         }
 
     }
@@ -371,9 +386,9 @@ object CompilationEngine {
             val (res2, left2) = compileStatements(ys)
             left2 match {
               case "}" :: zs =>
-                ("<whileStatement>" + help("while") + help("(") +
+                ("<whileStatement>\n" + help("while") + help("(") +
                   res1 + help(")") + help("{") + res2 + help("}") +
-                  "</whileStatement>", zs)
+                  "</whileStatement>\n", zs)
             }
         }
     }
@@ -382,12 +397,12 @@ object CompilationEngine {
   def compileReturn(str: List[String]): (String, List[String]) = {
     str match {
       case "return" :: ";" :: xs =>
-        ("<returnStatement>" + help("return") + help(";") + "</returnStatement>", xs)
+        ("<returnStatement>\n" + help("return") + help(";") + "</returnStatement>\n", xs)
       case "return" :: xs =>
         val (res, left) = compileExpression(xs)
         left match {
           case ";" :: ys =>
-            ("<returnStatement>" + help("return") + res + help(";") + "</returnStatement>", ys)
+            ("<returnStatement>\n" + help("return") + res + help(";") + "</returnStatement>\n", ys)
         }
     }
   }
@@ -404,17 +419,18 @@ object CompilationEngine {
                 val (res3, left3) = compileStatements(zs)
                 left3 match {
                   case "}" :: ks =>
-                    ("<ifStatement>" + help("if") + help("(") + res1 + help(")") + help("{") + res2 + help("}") + help("else") + help("{") + res3 + help("}") +
-                      "</ifStatement>", ks)
-              case "}" :: zs =>
-                    ("<ifStatement>" + help("if") + help("(") + res1 + help(")") + help("{") + res2 + help("}")  + "</ifStatement>", zs)
+                    ("<ifStatement>\n" + help("if") + help("(") + res1 + help(")") + help("{") + res2 + help("}") + help("else") + help("{") + res3 + help("}") +
+                      "</ifStatement>\n", ks)
+                  case "}" :: zs =>
+                    ("<ifStatement>\n" + help("if") + help("(") + res1 + help(")") + help("{") + res2 + help("}") + "</ifStatement>\n", zs)
+                }
             }
         }
     }
   }
 
   def opProcess(str: List[String]): (String, List[String]) = {
-    val set = Set("+", "-", "*", "/", "&", "|", "<", ">", "=")
+    val set = Set("+", "-", "*", "/", "&", "|", "<", ">\n", "=")
     str match {
       case x :: xs if set.contains(x) =>
         val (res, left) = compileTerm(xs)
@@ -427,8 +443,9 @@ object CompilationEngine {
 
   def compileExpression(str: List[String]): (String, List[String]) = {
     val (res1, left1) = compileTerm(str)
-    val (res2, left2) = onProcess(left1)
-    ("<expression>" + res + res2 + "</expression>", left2)
+    val (res2, left2) = opProcess(left1)
+
+    ("<expression>\n" + res1 + res2 + "</expression>\n", left2)
   }
 
   def compileTerm(str: List[String]): (String, List[String]) = {
@@ -436,11 +453,11 @@ object CompilationEngine {
       case x :: xs =>
         JackTokennizer.tokenType(x) match {
           case JackTokennizer.IntegerConstant =>
-            (help(x),xs)
+            (help(x), xs)
           case JackTokennizer.StringConstant =>
-            (help(x),xs)
+            (help(x), xs)
           case JackTokennizer.Keyword =>
-            (help(x),xs)
+            (help(x), xs)
           case JackTokennizer.Identifier =>
             xs match {
               case "[" :: ys =>
@@ -449,42 +466,40 @@ object CompilationEngine {
                   case "]" :: zs =>
                     (help(x) + help("[") + res1 + help("]"), zs)
                 }
-              case "(" :: ys =>
+              case "." :: ys =>
                 compileSubroutineCall(str)
               case ys =>
-                (help(x),xs)
+                (help(x), xs)
             }
           case JackTokennizer.Symbol =>
-           str match {
-             case "(" :: ys =>
-               val (res1, left1) = compileExpression(ys)
-               left1 match {
-                 case ")" :: zs =>
-                   (help("(") + res1 + help(")"), zs)
-               }
-             case "+" :: ys =>
-               val (res1, left1) = compileTerm(ys)
-               (help("+") + res1, left1)
-           }
+            str match {
+              case "-" :: ys =>
+                val (res1, left1) = compileTerm(ys)
+                (help("-") + res1, left1)
+              case "~" :: ys =>
+                val (res1, left1) = compileTerm(ys)
+                (help("~") + res1, left1)
+            }
         }
     }
-    ("<term>" + res + "</term>", left)
+    ("<term>\n" + res + "</term>\n", left)
   }
 
   def compileSubroutineCall(str: List[String]): (String, List[String]) = {
     str match {
-    case n1 :: "." :: n2 :: "(" :: xs =>
+      case n1 :: "." :: n2 :: "(" :: xs =>
         val (res1, left1) = compileExpressionList(xs)
         left1 match {
           case ")" :: ys =>
-            ("<subroutineCall>" + help(n1) + help(".") + help(n2) + help("(") + res1 + help(")") + "</subroutineCall>", ys)
+            (help(n1) + help(".") + help(n2) + help("(") + res1 + help(")"), ys)
         }
       case n :: "(" :: xs =>
         val (res1, left1) = compileExpressionList(xs)
- p      left1 match {
+        left1 match {
           case ")" :: ys =>
-            ("<subroutineCall>" + help(n) + help("(") + res1 + help(")") + "</subroutineCall>", ys)
-}
+            (help(n) + help("(") + res1 + help(")") + "</subroutineCall>\n", ys)
+        }
+    }
   }
 
   def exComma(str: List[String]): (String, List[String]) = {
@@ -493,6 +508,7 @@ object CompilationEngine {
         val (res1, left1) = compileExpression(xs)
         val (res2, left2) = exComma(left1)
         (help(",") + res1 + res2, left2)
+      case x => ("", x)
     }
   }
 
@@ -502,7 +518,7 @@ object CompilationEngine {
       case x =>
         val (res1, left1) = compileExpression(x)
         val (res2, left2) = exComma(left1)
-        ("<expressionList>" + res1 + res2 + "</expressionList>", left2)
+        ("<expressionList>\n" + res1 + res2 + "</expressionList>\n", left2)
     }
   }
 }
