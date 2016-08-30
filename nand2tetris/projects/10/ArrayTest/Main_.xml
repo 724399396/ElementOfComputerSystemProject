@@ -96,6 +96,9 @@
 <identifier>i</identifier>
 </term>
 <symbol>&lt;</symbol>
+<term>
+<identifier>length</identifier>
+</term>
 </expression>
 <symbol>)</symbol>
 <symbol>{</symbol>
@@ -138,6 +141,9 @@
 <identifier>i</identifier>
 </term>
 <symbol>+</symbol>
+<term>
+<integerConstant>1</integerConstant>
+</term>
 </expression>
 <symbol>;</symbol>
 </letStatement>
@@ -174,6 +180,9 @@
 <identifier>i</identifier>
 </term>
 <symbol>&lt;</symbol>
+<term>
+<identifier>length</identifier>
+</term>
 </expression>
 <symbol>)</symbol>
 <symbol>{</symbol>
@@ -187,6 +196,16 @@
 <identifier>sum</identifier>
 </term>
 <symbol>+</symbol>
+<term>
+<identifier>a</identifier>
+<symbol>[</symbol>
+<expression>
+<term>
+<identifier>i</identifier>
+</term>
+</expression>
+<symbol>]</symbol>
+</term>
 </expression>
 <symbol>;</symbol>
 </letStatement>
@@ -199,6 +218,9 @@
 <identifier>i</identifier>
 </term>
 <symbol>+</symbol>
+<term>
+<integerConstant>1</integerConstant>
+</term>
 </expression>
 <symbol>;</symbol>
 </letStatement>
@@ -233,6 +255,9 @@
 <identifier>sum</identifier>
 </term>
 <symbol>/</symbol>
+<term>
+<identifier>length</identifier>
+</term>
 </expression>
 </expressionList>
 <symbol>)</symbol>
@@ -245,8 +270,6 @@
 <identifier>println</identifier>
 <symbol>(</symbol>
 <expressionList>
-<expression>
-</expression>
 </expressionList>
 <symbol>)</symbol>
 <symbol>;</symbol>

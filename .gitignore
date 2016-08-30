@@ -1,4 +1,4 @@
 project/
 **/target/
 .ensime_cache/
-.ensime/
+.ensime
