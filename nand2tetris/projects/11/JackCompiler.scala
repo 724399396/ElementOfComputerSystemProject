@@ -209,7 +209,7 @@ object CompilationEngine {
         left2 match {
           case "}" :: left =>
             className = x
-            (res1 + res2 , left)
+            (res1 + res2, left)
           case x => println(x); throw new Error("class error 2")
         }
       case x => println(x); throw new Error("class error 1")
@@ -221,7 +221,7 @@ object CompilationEngine {
       case "," :: x :: xs =>
         val (ns, nl) = commaProcess(xs, t, k, seg)
         SymbolTable.define(x, t, k)
-        (VmWriter.writePush(seg,SymbolTable.indexOf(x).get) + ns, nl)
+        (ns, nl)
       case ";" :: xs =>
         ("", xs)
       case _ => ("", s)
@@ -234,12 +234,12 @@ object CompilationEngine {
         SymbolTable.define(y, x, SymbolTable.Static)
         val (c, left) = commaProcess(xs, x, SymbolTable.Static, VmWriter.Static)
         val (res, left1) = compileClassVarDec(left)
-        (VmWriter.writePush(VmWriter.Static,SymbolTable.indexOf(x).get) + c + res, left1)
+        (c + res, left1)
       case "field" :: x :: y :: xs =>
         SymbolTable.define(y, x, SymbolTable.Field)
         val (c, left) = commaProcess(xs, x, SymbolTable.Field, VmWriter.Local)
         val (res, left1) = compileClassVarDec(left)
-        (VmWriter.writePush(VmWriter.Local,SymbolTable.indexOf(x).get) + c + res, left1)
+        (c + res, left1)
       case x => ("", x)
     }
   }
@@ -279,12 +279,12 @@ object CompilationEngine {
       case ")" :: xs =>
         ("", i, str)
       case "," :: xs =>
-        val (res, ni, left) = compileParameterList(xs, i+1)
+        val (res, ni, left) = compileParameterList(xs, i + 1)
         (res, ni, left)
       case t :: n :: xs =>
         SymbolTable.define(n, t, SymbolTable.Arg)
-        val (res, ni, left) = compileParameterList(xs,i)
-        (VmWriter.writePush(VmWriter.Argument,SymbolTable.indexOf(n).get) + res, ni, left)
+        val (res, ni, left) = compileParameterList(xs, i)
+        (res, ni, left)
       case x =>
         println(x); throw new Error("parameter list error")
     }
@@ -293,7 +293,7 @@ object CompilationEngine {
   def compileVarDec(str: List[String]): (String, List[String]) = {
     str match {
       case "var" :: t :: x :: xs =>
-         SymbolTable.define(x, t, SymbolTable.Var)
+        SymbolTable.define(x, t, SymbolTable.Var)
         val (res, left) = commaProcess(xs, t, SymbolTable.Var, VmWriter.Local)
         left match {
           case y :: ys =>
@@ -302,7 +302,7 @@ object CompilationEngine {
                 compileVarDec(y :: ys)
               else
                 ("", y :: ys)
-            (VmWriter.writePush(VmWriter.Local,SymbolTable.indexOf(x).get) + res + res2, left2)
+            (res + res2, left2)
           case x => println(x); throw new Error("var error")
         }
       case x =>
@@ -365,8 +365,10 @@ object CompilationEngine {
             val (res2, left2) = compileExpression(ys)
             left2 match {
               case ";" :: zs =>
-                (VmWriter.writePush(kind2seg(SymbolTable.kindOf(n).get), 
-                  SymbolTable.indexOf(n).get) + VmWriter.writePush(VmWriter.Constant, res1.toInt) +  VmWriter.writeArithmetic("add") + VmWriter.writePop(VmWriter.Pointer, 1) + VmWriter.writePush(VmWriter.Constant, res2.toInt) + VmWriter.writePop(VmWriter.That, 0), zs)
+                (VmWriter.writePush(
+                  kind2seg(SymbolTable.kindOf(n).get),
+                  SymbolTable.indexOf(n).get
+                ) + VmWriter.writePush(VmWriter.Constant, res1.toInt) + VmWriter.writeArithmetic("add") + VmWriter.writePop(VmWriter.Pointer, 1) + VmWriter.writePush(VmWriter.Constant, res2.toInt) + VmWriter.writePop(VmWriter.That, 0), zs)
               case x => println(x); throw new Error("let error 4")
             }
           case x => println(x); throw new Error("let error 3")
@@ -375,7 +377,10 @@ object CompilationEngine {
         val (res1, left1) = compileExpression(xs)
         left1 match {
           case ";" :: ys =>
-            ("<letStatement>\n" + help("let") + help(n) + help("=") + res1 + help(";") + "</letStatement>\n", ys)
+            (VmWriter.writePop(VmWriter.Constant, res1.toInt) + VmWriter.writePush(
+                  kind2seg(SymbolTable.kindOf(n).get),
+                  SymbolTable.indexOf(n).get
+                ), ys)
           case x => println(x); throw new Error("let error 3")
         }
       case x => println(x); throw new Error("let error")
@@ -546,7 +551,7 @@ object CompilationEngine {
     str match {
       case "," :: xs =>
         val (res1, left1) = compileExpression(xs)
-        val (res2, ni, left2) = exComma(left1, i+1)
+        val (res2, ni, left2) = exComma(left1, i + 1)
         (res1 + res2, ni, left2)
       case x => ("", i, x)
     }
@@ -557,7 +562,7 @@ object CompilationEngine {
       case Nil => ("", i, Nil)
       case x =>
         val (res1, left1) = compileExpression(x)
-        val (res2, ni, left2) = if (res1 != "") exComma(left1, i+1) else exComma(left1, 0)
+        val (res2, ni, left2) = if (res1 != "") exComma(left1, i + 1) else exComma(left1, 0)
         (res1 + res2, ni, left2)
     }
   }
@@ -568,8 +573,7 @@ object SymbolTable {
   case object Static extends Kind
   case object Field extends Kind
   case object Arg extends Kind
-  case object oVar extends Kind
-
+  case object Var extends Kind
   import scala.collection.mutable.{Map => MutableMap}
   val classTable = MutableMap[String, (String, Kind, Int)]()
   val subroutineTable = MutableMap[String, (String, Kind, Int)]()
@@ -597,17 +601,20 @@ object SymbolTable {
 
   def kindOf(name: String): Option[Kind] = {
     classTable.get(name).map { case (_, k, _) => k }.orElse(
-       subroutineTable.get(name).map { case (_, k, _) => k })
+      subroutineTable.get(name).map { case (_, k, _) => k }
+    )
   }
 
   def typeOf(name: String): Option[String] = {
     classTable.get(name).map { case (t, _, _) => t }.orElse(
-       subroutineTable.get(name).map { case (t, _, _) => t })
+      subroutineTable.get(name).map { case (t, _, _) => t }
+    )
   }
 
-   def indexOf(name: String): Option[Int] = {
+  def indexOf(name: String): Option[Int] = {
     classTable.get(name).map { case (_, _, i) => i }.orElse(
-       subroutineTable.get(name).map { case (_, _, i) => i })
+      subroutineTable.get(name).map { case (_, _, i) => i }
+    )
   }
 }
 
