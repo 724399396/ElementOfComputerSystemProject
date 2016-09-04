@@ -340,14 +340,16 @@ object CompilationEngine {
         val (res1, i, left1) = compileExpressionList(xs)
         left1 match {
           case ")" :: ";" :: ys =>
-            (res1 + VmWriter.writeCall(n1 + "." + n2, i), ys)
+            (res1 + VmWriter.writeCall(n1 + "." + n2, i) + 
+              VmWriter.writePop(VmWriter.Temp, 0), ys)
           case x => println(x); throw new Error("do error 1")
         }
       case "do" :: n :: "(" :: xs =>
         val (res1, i, left1) = compileExpressionList(xs)
         left1 match {
           case ")" :: ";" :: ys =>
-            (res1 + VmWriter.writeCall(n, i), ys)
+            (res1 + VmWriter.writeCall(n, i) + 
+              VmWriter.writePop(VmWriter.Temp, 0), ys)
           case x => println(x); throw new Error("do error 2")
         }
 
@@ -467,7 +469,6 @@ object CompilationEngine {
   def compileExpression(str: List[String]): (String, List[String]) = {
     val (res1, left1) = compileTerm(str)
     val (res2, left2) = opProcess(left1)
-
     (res1 + res2, left2)
   }
 
@@ -509,7 +510,7 @@ object CompilationEngine {
                 val (res1, left1) = compileExpression(xs)
                 left1 match {
                   case ")" :: left2 =>
-                    (/**help("(") + res1 + help(")")*/ "", left2)
+                    (res1, left2)
                   case x => println(x); throw new Error("term error 4")
                 }
               case x =>
