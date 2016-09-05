@@ -10,7 +10,7 @@ object JackAnalyzer {
 
     for (file <- files) {
       SymbolTable.startSubroutine()
-      val out = new File(file.getParentFile(), file.getName.takeWhile(_ != '.') + ".vm")
+      val out = new File(file.getParentFile(), file.getName.takeWhile(_ != '.') + "_.vm")
       CompilationEngine.recursiveDescentParser(JackTokennizer.tokennizer(file), out);
     }
   }
@@ -204,11 +204,11 @@ object CompilationEngine {
   def compileClass(str: List[String]): (String, List[String]) = {
     str match {
       case "class" :: x :: "{" :: xs =>
+        className = x
         val (res1, left1) = compileClassVarDec(xs)
         val (res2, left2) = compileSubroutine(left1)
         left2 match {
           case "}" :: left =>
-            className = x
             (res1 + res2 , left)
           case x => println(x); throw new Error("class error 2")
         }
@@ -253,7 +253,7 @@ object CompilationEngine {
           case ")" :: ys =>
             val (res2, i, left2) = compileSubroutineBody(ys)
             val (res3, left3) = compileSubroutine(left2)
-            (VmWriter.writeFunction(className + n, i) + res1 + res2 + res3, left3)
+            (VmWriter.writeFunction(className + "." + n, i) + res1 + res2 + res3, left3)
           case x => println(x); throw new Error("subroutine error")
         }
       case x => ("", x)
@@ -340,14 +340,16 @@ object CompilationEngine {
         val (res1, i, left1) = compileExpressionList(xs)
         left1 match {
           case ")" :: ";" :: ys =>
-            (res1 + VmWriter.writeCall(n1 + "." + n2, i), ys)
+            (res1 + VmWriter.writeCall(n1 + "." + n2, i) + 
+              VmWriter.writePop(VmWriter.Temp, 0), ys)
           case x => println(x); throw new Error("do error 1")
         }
       case "do" :: n :: "(" :: xs =>
         val (res1, i, left1) = compileExpressionList(xs)
         left1 match {
           case ")" :: ";" :: ys =>
-            (res1 + VmWriter.writeCall(n, i), ys)
+            (res1 + VmWriter.writeCall(n, i) + 
+              VmWriter.writePop(VmWriter.Temp, 0), ys)
           case x => println(x); throw new Error("do error 2")
         }
 
@@ -458,7 +460,7 @@ object CompilationEngine {
       case x :: xs if set.contains(x) =>
         val (res, left) = compileTerm(xs)
         val (res2, left2) = opProcess(left)
-        (/**help(x) */ res + res2, left2)
+        (res + res2 + VmWriter.writeArithmetic(x), left2)
       case x =>
         ("", x)
     }
@@ -467,16 +469,15 @@ object CompilationEngine {
   def compileExpression(str: List[String]): (String, List[String]) = {
     val (res1, left1) = compileTerm(str)
     val (res2, left2) = opProcess(left1)
-
-    (if (res1.isEmpty) res1 + res2 else "<expression>\n" + res1 + res2 + "</expression>\n", left2)
+    (res1 + res2, left2)
   }
 
   def compileTerm(str: List[String]): (String, List[String]) = {
-    val (res, left) = str match {
+    str match {
       case x :: xs =>
         JackTokennizer.tokenType(x) match {
           case JackTokennizer.IntegerConstant =>
-            (/**help(x)*/ "", xs)
+            (VmWriter.writePush(VmWriter.Constant, x.toInt), xs)
           case JackTokennizer.StringConstant =>
             (/**help(x)*/ "", xs)
           case JackTokennizer.Keyword =>
@@ -509,7 +510,7 @@ object CompilationEngine {
                 val (res1, left1) = compileExpression(xs)
                 left1 match {
                   case ")" :: left2 =>
-                    (/**help("(") + res1 + help(")")*/ "", left2)
+                    (res1, left2)
                   case x => println(x); throw new Error("term error 4")
                 }
               case x =>
@@ -519,7 +520,6 @@ object CompilationEngine {
       case _ =>
         throw new Error("term error 3")
     }
-    (if (res.isEmpty) res else "<term>\n" + res + "</term>\n", left)
   }
 
   def compileSubroutineCall(str: List[String]): (String, List[String]) = {
@@ -630,38 +630,43 @@ object VmWriter {
   }
 
   def writePush(seg: Segment, index: Int): String = {
-    s"push $seg.toString.toLowerCase $index"
+    s"push ${seg.toString.toLowerCase} $index\n"
   }
 
   def writePop(seg: Segment, index: Int): String = {
-    s"pop $seg.toString.toLowerCase $index"
+    s"pop ${seg.toString.toLowerCase} $index\n"
   }
 
   def writeArithmetic(command: String): String = {
-    command.toLowerCase
+    val x = command match {
+      case "+" => "add"
+      case "*" => "call Math.multiply 2"
+      case _ => throw new Error("unkown arithemetic")
+    }
+    x + "\n"
   }
 
   def writeLable(label: String): String = {
-    s"($label)"
+    s"($label)\n"
   }
 
   def writeGoto(label: String): String = {
-    s"goto $label"
+    s"goto $label\n"
   }
 
   def writeIf(label: String): String = {
-    s"if-goto $label"
+    s"if-goto $label\n"
   }
 
   def writeCall(name: String, nArgs: Int): String = {
-    s"call $name $nArgs"
+    s"call $name $nArgs\n"
   }
 
   def writeFunction(name: String, nLocals: Int): String = {
-    s"function $name $nLocals"
+    s"function $name $nLocals\n"
   }
 
   def writeReturn(): String = {
-    "return"
+    "return\n"
   }
 }
