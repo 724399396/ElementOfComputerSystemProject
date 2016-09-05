@@ -193,7 +193,7 @@ object JackTokennizer {
 object CompilationEngine {
   import java.io.File
   var className = ""
-  def recursiveDescentParser(tokens: List[String], outFile: File) {
+  def recursiveDescentParser(tokens: List[String], outFile: File) = {
     val (res, left) = compileClass(tokens)
     val out = new java.io.PrintWriter(outFile)
     out.print(res)
@@ -251,7 +251,7 @@ object CompilationEngine {
         val (res1, left1) = compileParameterList(xs)
         left1 match {
           case ")" :: ys =>
-            val (res2, i, left2) = compileSubroutineBody(ys, n)
+            val (res2, i, left2) = compileSubroutineBody(ys)
             val (res3, left3) = compileSubroutine(left2)
             (VmWriter.writeFunction(className + "." + n, i) + res1 + res2 + res3, left3)
           case x => println(x); throw new Error("subroutine error")
@@ -260,11 +260,11 @@ object CompilationEngine {
     }
   }
 
-  def compileSubroutineBody(str: List[String], fName: String): (String, Int, List[String]) = {
+  def compileSubroutineBody(str: List[String]): (String, Int, List[String]) = {
     str match {
       case "{" :: ys =>
         val (res2, i, left2) = compileVarDec(ys)
-        val (res3, left3) = compileStatements(left2, fName = fName)
+        val (res3, left3) = compileStatements(left2)
         left3 match {
           case "}" :: left =>
             (res2 + res3, i, left)
@@ -284,7 +284,7 @@ object CompilationEngine {
       case t :: n :: xs =>
         SymbolTable.define(n, t, SymbolTable.Arg)
         val (res, left) = compileParameterList(xs)
-        (VmWriter.writePush(VmWriter.Argument,SymbolTable.indexOf(n).get) + res, left)
+        (res, left)
       case x =>
         println(x); throw new Error("parameter list error")
     }
@@ -293,13 +293,13 @@ object CompilationEngine {
   def compileVarDec(str: List[String], i: Int = 0): (String, Int, List[String]) = {
     str match {
       case "var" :: t :: x :: xs =>
-         SymbolTable.define(x, t, SymbolTable.Var)
+        SymbolTable.define(x, t, SymbolTable.Var)
         val (res, j, left) = commaProcess(xs, t, SymbolTable.Var, VmWriter.Local, i+1)
         left match {
           case y :: ys =>
             val (res2, k, left2) =
               if (y == "var")
-                compileVarDec(y :: ys, j+1)
+                compileVarDec(y :: ys, j)
               else
                 ("", j, y :: ys)
             (res + res2, k, left2)
@@ -310,14 +310,14 @@ object CompilationEngine {
     }
   }
 
-  def compileStatements(str: List[String], firstIn: Boolean = true, fName: String = ""): (String, List[String]) = {
+  def compileStatements(str: List[String], firstIn: Boolean = true, ifCur: Int = 0, whileCur: Int = 0): (String, List[String]) = {
     val (res1, left1) = str match {
       case "let" :: xs =>
         compileLet(str)
       case "if" :: xs =>
-        compileIf(str, fName)
+        compileIf(str, ifCur)
       case "while" :: xs =>
-        compileWhile(str, fName)
+        compileWhile(str, whileCur)
       case "do" :: xs =>
         compileDo(str)
       case "return" :: xs =>
@@ -340,7 +340,8 @@ object CompilationEngine {
         val (res1, i, left1) = compileExpressionList(xs)
         left1 match {
           case ")" :: ";" :: ys =>
-            (res1 + VmWriter.writeCall(n1 + "." + n2, i) + 
+            (res1 + (if(n1.head.isUpper) VmWriter.writeCall(n1 + "." + n2, i) else
+              VmWriter.writePush(kind2seg(SymbolTable.kindOf(n1).get),SymbolTable.indexOf(n1).get) + VmWriter.writeCall(SymbolTable.typeOf(n1).get + "." + n2, i+1)) +
               VmWriter.writePop(VmWriter.Temp, 0), ys)
           case x => println(x); throw new Error("do error 1")
         }
@@ -397,18 +398,17 @@ object CompilationEngine {
     VmWriter.writeArithmetic("~")
   }
 
-  def compileWhile(str: List[String], fName: String): (String, List[String]) = {
+  def compileWhile(str: List[String], cur: Int): (String, List[String]) = {
     str match {
       case "while" :: "(" :: xs =>
         val (res1, left1) = compileExpression(xs)
         left1 match {
           case ")" :: "{" :: ys =>
-            val (res2, left2) = compileStatements(ys)
+            val (res2, left2) = compileStatements(ys, whileCur = cur+1)
             left2 match {
               case "}" :: zs =>
-                val labelPrefix = s"$className.$fName"
-                (VmWriter.writeLable(labelPrefix + " L1") + res1 + not()
-                  + VmWriter.writeIf(labelPrefix +" L2") + res2 + VmWriter.writeGoto(labelPrefix + " L1") + VmWriter.writeLable(labelPrefix + " L2") , zs)
+                (VmWriter.writeLable(s"WHILE_EXP$cur") + res1 + not()
+                  + VmWriter.writeIf(s"WHILE_END$cur") + res2 + VmWriter.writeGoto(s"WHILE_EXP$cur") + VmWriter.writeLable(s"WHILE_END$cur") , zs)
               case x => println(x); throw new Error("while error 3")
             }
           case x => println(x); throw new Error("while error 2")
@@ -425,33 +425,33 @@ object CompilationEngine {
         val (res, left) = compileExpression(xs)
         left match {
           case ";" :: ys =>
-            (/**"<returnStatement>\n" + help("return") + res + help(";") + "</returnStatement>\n" */ "", ys)
+            (res + VmWriter.writeReturn(), ys)
           case x => println(x); throw new Error("return error 2")
         }
       case x => println(x); throw new Error("return error")
     }
   }
 
-  def compileIf(str: List[String], fName: String): (String, List[String]) = {
+  def compileIf(str: List[String], cur: Int): (String, List[String]) = {
     str match {
       case "if" :: "(" :: xs =>
-        val labelPrefix = s"$className.$fName"
         val (res1, left1) = compileExpression(xs)
         left1 match {
           case ")" :: "{" :: ys =>
-            val (res2, left2) = compileStatements(ys)
+            val (res2, left2) = compileStatements(ys, ifCur = cur+1)
             left2 match {
               case "}" :: "else" :: "{" :: zs =>
                 val (res3, left3) = compileStatements(zs)
                 left3 match {
                   case "}" :: ks =>
-                    (res1 + not() + VmWriter.writeIf(labelPrefix + " L1") + res2 +
-                      VmWriter.writeGoto(labelPrefix + " L2") + VmWriter.writeLable(labelPrefix + " L1") + res3 + VmWriter.writeLable(labelPrefix + "L2"), ks)
+                    (res1 + VmWriter.writeIf(s"IF_TRUE$cur") +
+                      VmWriter.writeGoto(s"IF_FALSE$cur") + VmWriter.writeLable(s"IF_TRUE$cur") + res2 + VmWriter.writeGoto(s"IF_END$cur") +  VmWriter.writeLable(s"IF_FALSE$cur") + res3 +
+VmWriter.writeLable(s"IF_END$cur"), ks)
                   case x => println(x); throw new Error("if error 4")
                 }
               case "}" :: zs =>
-                (res1 + not() + VmWriter.writeIf(labelPrefix + " L1") + res2 +
-                      VmWriter.writeLable(labelPrefix + " L1"), zs)
+                (res1 + not() + VmWriter.writeIf(s"IF_FALSE$cur") + res2 +
+                      VmWriter.writeLable(s"IF_TRUE$cur"), zs)
               case x => println(x); throw new Error("if error 3")
             }
           case x => println(x); throw new Error("if error 2")
@@ -487,7 +487,7 @@ object CompilationEngine {
           case JackTokennizer.StringConstant =>
             (/**help(x)*/ "", xs)
           case JackTokennizer.Keyword =>
-            (/**help(x)*/ "", xs)
+            (VmWriter.writeKeyWord(x), xs)
           case JackTokennizer.Identifier =>
             xs match {
               case "[" :: ys =>
@@ -659,7 +659,7 @@ object VmWriter {
   }
 
   def writeLable(label: String): String = {
-    s"($label)\n"
+    s"label $label\n"
   }
 
   def writeGoto(label: String): String = {
@@ -680,5 +680,18 @@ object VmWriter {
 
   def writeReturn(): String = {
     "return\n"
+  }
+
+  def writeKeyWord(command: String): String = {
+    command match {
+      case "true" => 
+        writePush(Constant, 0) +
+        "not\n"
+      case "false" =>
+        writePush(Constant, 0)
+      case _ =>
+        println("ignore keyword" + command)
+        ""
+    }
   }
 }
