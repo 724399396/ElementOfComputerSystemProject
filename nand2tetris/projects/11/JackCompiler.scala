@@ -216,15 +216,15 @@ object CompilationEngine {
     }
   }
 
-  def commaProcess(s: List[String], t: String, k: SymbolTable.Kind, seg: VmWriter.Segment): (String, List[String]) = {
+  def commaProcess(s: List[String], t: String, k: SymbolTable.Kind, seg: VmWriter.Segment, i: Int = 0): (String, Int, List[String]) = {
     s match {
       case "," :: x :: xs =>
-        val (ns, nl) = commaProcess(xs, t, k, seg)
+        val (ns, j, nl) = commaProcess(xs, t, k, seg)
         SymbolTable.define(x, t, k)
-        (VmWriter.writePush(seg,SymbolTable.indexOf(x).get) + ns, nl)
+        (VmWriter.writePush(seg,SymbolTable.indexOf(x).get) + ns, j+1, nl)
       case ";" :: xs =>
-        ("", xs)
-      case _ => ("", s)
+        ("", i, xs)
+      case _ => ("", i, s)
     }
   }
 
@@ -232,12 +232,12 @@ object CompilationEngine {
     str match {
       case "static" :: x :: y :: xs =>
         SymbolTable.define(className + "." + y, x, SymbolTable.Static)
-        val (c, left) = commaProcess(xs, x, SymbolTable.Static, VmWriter.Static)
+        val (c, _, left) = commaProcess(xs, x, SymbolTable.Static, VmWriter.Static)
         val (res, left1) = compileClassVarDec(left)
         (VmWriter.writePush(VmWriter.Static,SymbolTable.indexOf(x).get) + c + res, left1)
       case "field" :: x :: y :: xs =>
         SymbolTable.define(y, x, SymbolTable.Field)
-        val (c, left) = commaProcess(xs, x, SymbolTable.Field, VmWriter.Local)
+        val (c, _, left) = commaProcess(xs, x, SymbolTable.Field, VmWriter.Local)
         val (res, left1) = compileClassVarDec(left)
         (VmWriter.writePush(VmWriter.Local,SymbolTable.indexOf(x).get) + c + res, left1)
       case x => ("", x)
@@ -248,10 +248,10 @@ object CompilationEngine {
     val set = Set("constructor", "function", "method")
     str match {
       case x :: t :: n :: "(" :: xs if set.contains(x) =>
-        val (res1, i, left1) = compileParameterList(xs, 0)
+        val (res1, left1) = compileParameterList(xs)
         left1 match {
           case ")" :: ys =>
-            val (res2, left2) = compileSubroutineBody(ys)
+            val (res2, i, left2) = compileSubroutineBody(ys)
             val (res3, left3) = compileSubroutine(left2)
             (VmWriter.writeFunction(className + n, i) + res1 + res2 + res3, left3)
           case x => println(x); throw new Error("subroutine error")
@@ -260,53 +260,53 @@ object CompilationEngine {
     }
   }
 
-  def compileSubroutineBody(str: List[String]): (String, List[String]) = {
+  def compileSubroutineBody(str: List[String]): (String, Int, List[String]) = {
     str match {
       case "{" :: ys =>
-        val (res2, left2) = compileVarDec(ys)
+        val (res2, i, left2) = compileVarDec(ys)
         val (res3, left3) = compileStatements(left2)
         left3 match {
           case "}" :: left =>
-            (res2 + res3, left)
+            (res2 + res3, i, left)
           case x => println(x); throw new Error("subroutineBody error 2")
         }
       case x => println(x); throw new Error("subroutineBody error 1")
     }
   }
 
-  def compileParameterList(str: List[String], i: Int): (String, Int, List[String]) = {
+  def compileParameterList(str: List[String]): (String, List[String]) = {
     str match {
       case ")" :: xs =>
-        ("", i, str)
+        ("", str)
       case "," :: xs =>
-        val (res, ni, left) = compileParameterList(xs, i+1)
-        (res, ni, left)
+        val (res, left) = compileParameterList(xs)
+        (res, left)
       case t :: n :: xs =>
         SymbolTable.define(n, t, SymbolTable.Arg)
-        val (res, ni, left) = compileParameterList(xs,i)
-        (VmWriter.writePush(VmWriter.Argument,SymbolTable.indexOf(n).get) + res, ni, left)
+        val (res, left) = compileParameterList(xs)
+        (VmWriter.writePush(VmWriter.Argument,SymbolTable.indexOf(n).get) + res, left)
       case x =>
         println(x); throw new Error("parameter list error")
     }
   }
 
-  def compileVarDec(str: List[String]): (String, List[String]) = {
+  def compileVarDec(str: List[String], i: Int = 0): (String, Int, List[String]) = {
     str match {
       case "var" :: t :: x :: xs =>
          SymbolTable.define(x, t, SymbolTable.Var)
-        val (res, left) = commaProcess(xs, t, SymbolTable.Var, VmWriter.Local)
+        val (res, j, left) = commaProcess(xs, t, SymbolTable.Var, VmWriter.Local, i)
         left match {
           case y :: ys =>
-            val (res2, left2) =
+            val (res2, k, left2) =
               if (y == "var")
-                compileVarDec(y :: ys)
+                compileVarDec(y :: ys, j)
               else
-                ("", y :: ys)
-            (VmWriter.writePush(VmWriter.Local,SymbolTable.indexOf(x).get) + res + res2, left2)
+                ("", j, y :: ys)
+            (VmWriter.writePush(VmWriter.Local,SymbolTable.indexOf(x).get) + res + res2, k, left2)
           case x => println(x); throw new Error("var error")
         }
       case x =>
-        ("", x)
+        ("", i, x)
     }
   }
 
