@@ -1,4 +1,4 @@
-object JackAnalyzer {
+ object JackAnalyzer {
   import java.io.File
 
   def main(args: Array[String]): Unit = {
@@ -204,6 +204,8 @@ object CompilationEngine {
     str match {
       case "class" :: x :: "{" :: xs =>
         className = x
+        fieldCount = 0
+        SymbolTable.startClass()
         val (res1, left1) = compileClassVarDec(xs)
         val (res2, left2) = compileSubroutine(left1)
         left2 match {
@@ -275,7 +277,7 @@ object CompilationEngine {
     str match {
       case "{" :: ys =>
         val (res2, i, left2) = compileVarDec(ys)
-        val (res3, left3) = compileStatements(left2)
+        val (res3, left3) = compileStatements(left2, true)
         left3 match {
           case "}" :: left =>
             (res2 + res3, i, left)
@@ -321,14 +323,21 @@ object CompilationEngine {
     }
   }
 
-  def compileStatements(str: List[String], firstIn: Boolean = true, ifCur: Int = 0, whileCur: Int = 0): (String, List[String]) = {
+  var ifCur = 0
+  var whileCur = 0
+
+  def compileStatements(str: List[String], firstIn: Boolean = false): (String, List[String]) = {
+    if (firstIn) {
+      ifCur = 0
+      whileCur = 0
+    }
     val (res1, left1) = str match {
       case "let" :: xs =>
         compileLet(str)
       case "if" :: xs =>
-        compileIf(str, ifCur)
+        compileIf(str)
       case "while" :: xs =>
-        compileWhile(str, whileCur)
+        compileWhile(str)
       case "do" :: xs =>
         compileDo(str)
       case "return" :: xs =>
@@ -339,7 +348,7 @@ object CompilationEngine {
       case "}" :: xs =>
         (res1, left1)
       case ys =>
-        val (res2, left2) = compileStatements(ys, false)
+        val (res2, left2) = compileStatements(ys)
         (res1 + res2, left2)
     }
     (res, left)
@@ -379,8 +388,7 @@ object CompilationEngine {
             val (res2, left2) = compileExpression(ys)
             left2 match {
               case ";" :: zs =>
-                (VmWriter.writePush(kind2seg(SymbolTable.kindOf(n).get), 
-                  SymbolTable.indexOf(n).get) + VmWriter.writePush(VmWriter.Constant, res1.toInt) +  VmWriter.writeArithmetic("add") + VmWriter.writePop(VmWriter.Pointer, 1) + VmWriter.writePush(VmWriter.Constant, res2.toInt) + VmWriter.writePop(VmWriter.That, 0), zs)
+                (writePushN(n) + res1 + VmWriter.writeArithmetic("+") +  VmWriter.writePop(VmWriter.Pointer, 1) + res2 + VmWriter.writePop(VmWriter.That, 0), zs)
               case x => println(x); throw new Error("let error 4")
             }
           case x => println(x); throw new Error("let error 3")
@@ -413,13 +421,15 @@ object CompilationEngine {
     VmWriter.writeArithmetic("~")
   }
 
-  def compileWhile(str: List[String], cur: Int): (String, List[String]) = {
+  def compileWhile(str: List[String]): (String, List[String]) = {
+    val cur = whileCur
+    whileCur += 1
     str match {
       case "while" :: "(" :: xs =>
         val (res1, left1) = compileExpression(xs)
         left1 match {
           case ")" :: "{" :: ys =>
-            val (res2, left2) = compileStatements(ys, whileCur = cur+1)
+            val (res2, left2) = compileStatements(ys)
             left2 match {
               case "}" :: zs =>
                 (VmWriter.writeLable(s"WHILE_EXP$cur") + res1 + not()
@@ -447,13 +457,15 @@ object CompilationEngine {
     }
   }
 
-  def compileIf(str: List[String], cur: Int): (String, List[String]) = {
+  def compileIf(str: List[String]): (String, List[String]) = {
+    val cur = ifCur
+    ifCur += 1
     str match {
       case "if" :: "(" :: xs =>
         val (res1, left1) = compileExpression(xs)
         left1 match {
           case ")" :: "{" :: ys =>
-            val (res2, left2) = compileStatements(ys, ifCur = cur+1)
+            val (res2, left2) = compileStatements(ys)
             left2 match {
               case "}" :: "else" :: "{" :: zs =>
                 val (res3, left3) = compileStatements(zs)
@@ -599,6 +611,10 @@ object SymbolTable {
     subroutineTable.clear()
   }
 
+   def startClass(): Unit = {
+    classTable.clear()
+  }
+
   def define(name: String, t: String, kind: Kind): Unit = {
     if (kind == Static || kind == Field) {
       classTable += Tuple2(name, (t, kind, varCount(kind)))
@@ -662,6 +678,7 @@ object VmWriter {
       case "+" => "add"
       case "-" => "sub"
       case "*" => "call Math.multiply 2"
+      case "/" => "call Math.divide 2"
       case "~" => "not"
       case ">" => "gt"
       case "<" => "lt"

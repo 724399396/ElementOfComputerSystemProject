@@ -1,0 +1,56 @@
+function Main.main 4
+call Keyboard.readInt 0
+pop local 1
+push local 1
+call Array.new 1
+pop local 0
+push constant 0
+pop local 2
+label WHILE_EXP0
+push local 2
+push local 1
+lt
+not
+if-goto WHILE_END0
+push local 0
+push local 2
+add
+pop pointer 1
+call Keyboard.readInt 0
+pop that 0
+push local 2
+push constant 1
+add
+pop local 2
+goto WHILE_EXP0
+label WHILE_END0
+push constant 0
+pop local 2
+push constant 0
+pop local 3
+label WHILE_EXP1
+push local 2
+push local 1
+lt
+not
+if-goto WHILE_END1
+push local 3
+add
+pop local 3
+push local 2
+push constant 1
+add
+pop local 2
+goto WHILE_EXP1
+label WHILE_END1
+call Output.printString 0
+pop temp 0
+push local 3
+push local 1
+call Math.divide 2
+call Output.printInt 1
+pop temp 0
+call Output.println 0
+pop temp 0
+push constant 0
+return
