@@ -1,4 +1,4 @@
- object JackAnalyzer {
+object JackAnalyzer {
   import java.io.File
 
   def main(args: Array[String]): Unit = {
@@ -50,8 +50,12 @@ object JackTokennizer {
   import scala.io.Source
   def tokennizer(in: File): List[String] = {
     val con = Source.fromFile(in).getLines.toList
-    val ignoreCommentStr = ignoreComment(con)
-    ignoreCommentStr.flatMap(x => x.replaceAll("\\(", " ( ").
+    val ignoreCommentStr: List[String] = ignoreComment(con)
+
+    val sourceString: List[String] = ignoreCommentStr.flatten.zipWithIndex.filter { case (x, _) => x == '"' }.map { case (_, i) => i }.grouped(2).map { case List(s, e) => ignoreCommentStr.flatten.drop(s).take(e - s + 1).mkString }.toList
+
+    var sourceStringLoc = -1
+    val res = ignoreCommentStr.flatMap(x => x.replaceAll("\\(", " ( ").
       replaceAll("\\)", " ) ").replaceAll(";", " ; ").
       replaceAll(",", " , ").replaceAll("\\.", " . ").
       replaceAll("~", " ~ ").replaceAll("-", " - ").replaceAll("\\[", " [ ").replaceAll("\\]", " ] ").split("\\s+").toList.foldLeft((List[String](), List[String]())) {
@@ -59,14 +63,18 @@ object JackTokennizer {
           if (x.contains("\""))
             if (strCon.isEmpty)
               (acc, strCon ++ List(x))
-            else
-              (acc ++ List((strCon ++ List(x)).mkString("")), List[String]())
+            else {
+              sourceStringLoc += 1
+              (acc ++ List(sourceString.apply(sourceStringLoc).mkString("")) /*((strCon ++ List(x)).mkString("")*/ , List[String]())
+            }
           else if (strCon.isEmpty)
             (acc ++ List(x), strCon)
           else
             (acc, strCon ++ List(x))
 
       }._1)
+    println(res)
+    res
   }
 
   def run(in: File): Unit = {
@@ -210,7 +218,7 @@ object CompilationEngine {
         val (res2, left2) = compileSubroutine(left1)
         left2 match {
           case "}" :: left =>
-            (res1 + res2 , left)
+            (res1 + res2, left)
           case x => println(x); throw new Error("class error 2")
         }
       case x => println(x); throw new Error("class error 1")
@@ -222,7 +230,7 @@ object CompilationEngine {
       case "," :: x :: xs =>
         val (ns, j, nl) = commaProcess(xs, t, k, seg, i)
         SymbolTable.define(x, t, k)
-        (ns, j+1, nl)
+        (ns, j + 1, nl)
       case ";" :: xs =>
         ("", i, xs)
       case _ => ("", i, s)
@@ -237,7 +245,7 @@ object CompilationEngine {
         SymbolTable.define(className + "." + y, x, SymbolTable.Static)
         val (c, _, left) = commaProcess(xs, x, SymbolTable.Static, VmWriter.Static)
         val (res, left1) = compileClassVarDec(left)
-        (VmWriter.writePush(VmWriter.Static,SymbolTable.indexOf(x).get) + c + res, left1)
+        (VmWriter.writePush(VmWriter.Static, SymbolTable.indexOf(x).get) + c + res, left1)
       case "field" :: x :: y :: xs =>
         SymbolTable.define(y, x, SymbolTable.Field)
         fieldCount += 1
@@ -307,7 +315,7 @@ object CompilationEngine {
     str match {
       case "var" :: t :: x :: xs =>
         SymbolTable.define(x, t, SymbolTable.Var)
-        val (res, j, left) = commaProcess(xs, t, SymbolTable.Var, VmWriter.Local, i+1)
+        val (res, j, left) = commaProcess(xs, t, SymbolTable.Var, VmWriter.Local, i + 1)
         left match {
           case y :: ys =>
             val (res2, k, left2) =
@@ -360,8 +368,8 @@ object CompilationEngine {
         val (res1, i, left1) = compileExpressionList(xs)
         left1 match {
           case ")" :: ";" :: ys =>
-            (res1 + (if(n1.head.isUpper) VmWriter.writeCall(n1 + "." + n2, i) else
-              writePushN(n1) + VmWriter.writeCall(SymbolTable.typeOf(n1).get + "." + n2, i+1)) +
+            (res1 + (if (n1.head.isUpper) VmWriter.writeCall(n1 + "." + n2, i) else
+              writePushN(n1) + VmWriter.writeCall(SymbolTable.typeOf(n1).get + "." + n2, i + 1)) +
               VmWriter.writePop(VmWriter.Temp, 0), ys)
           case x => println(x); throw new Error("do error 1")
         }
@@ -369,7 +377,7 @@ object CompilationEngine {
         val (res1, i, left1) = compileExpressionList(xs)
         left1 match {
           case ")" :: ";" :: ys =>
-            (res1 + VmWriter.writePush(VmWriter.Pointer, 0) + VmWriter.writeCall(className + "." + n , i+1) +
+            (res1 + VmWriter.writePush(VmWriter.Pointer, 0) + VmWriter.writeCall(className + "." + n, i + 1) +
               VmWriter.writePop(VmWriter.Temp, 0), ys)
           case x => println(x); throw new Error("do error 2")
         }
@@ -388,7 +396,7 @@ object CompilationEngine {
             val (res2, left2) = compileExpression(ys)
             left2 match {
               case ";" :: zs =>
-                (writePushN(n) + res1 + VmWriter.writeArithmetic("+") +  VmWriter.writePop(VmWriter.Pointer, 1) + res2 + VmWriter.writePop(VmWriter.That, 0), zs)
+                (writePushN(n) + res1 + VmWriter.writeArithmetic("+") + VmWriter.writePop(VmWriter.Pointer, 1) + res2 + VmWriter.writePop(VmWriter.That, 0), zs)
               case x => println(x); throw new Error("let error 4")
             }
           case x => println(x); throw new Error("let error 3")
@@ -414,7 +422,7 @@ object CompilationEngine {
   }
 
   def writePushN(n: String): String = {
-    VmWriter.writePush(kind2seg(SymbolTable.kindOf(n).get),SymbolTable.indexOf(n).get)
+    VmWriter.writePush(kind2seg(SymbolTable.kindOf(n).get), SymbolTable.indexOf(n).get)
   }
 
   def not(): String = {
@@ -433,7 +441,7 @@ object CompilationEngine {
             left2 match {
               case "}" :: zs =>
                 (VmWriter.writeLable(s"WHILE_EXP$cur") + res1 + not()
-                  + VmWriter.writeIf(s"WHILE_END$cur") + res2 + VmWriter.writeGoto(s"WHILE_EXP$cur") + VmWriter.writeLable(s"WHILE_END$cur") , zs)
+                  + VmWriter.writeIf(s"WHILE_END$cur") + res2 + VmWriter.writeGoto(s"WHILE_EXP$cur") + VmWriter.writeLable(s"WHILE_END$cur"), zs)
               case x => println(x); throw new Error("while error 3")
             }
           case x => println(x); throw new Error("while error 2")
@@ -472,13 +480,13 @@ object CompilationEngine {
                 left3 match {
                   case "}" :: ks =>
                     (res1 + VmWriter.writeIf(s"IF_TRUE$cur") +
-                      VmWriter.writeGoto(s"IF_FALSE$cur") + VmWriter.writeLable(s"IF_TRUE$cur") + res2 + VmWriter.writeGoto(s"IF_END$cur") +  VmWriter.writeLable(s"IF_FALSE$cur") + res3 +
-VmWriter.writeLable(s"IF_END$cur"), ks)
+                      VmWriter.writeGoto(s"IF_FALSE$cur") + VmWriter.writeLable(s"IF_TRUE$cur") + res2 + VmWriter.writeGoto(s"IF_END$cur") + VmWriter.writeLable(s"IF_FALSE$cur") + res3 +
+                      VmWriter.writeLable(s"IF_END$cur"), ks)
                   case x => println(x); throw new Error("if error 4")
                 }
               case "}" :: zs =>
                 (res1 + VmWriter.writeIf(s"IF_TRUE$cur") + VmWriter.writeGoto(s"IF_FALSE$cur") + VmWriter.writeLable(s"IF_TRUE$cur") + res2 +
-                      VmWriter.writeLable(s"IF_FALSE$cur"), zs)
+                  VmWriter.writeLable(s"IF_FALSE$cur"), zs)
               case x => println(x); throw new Error("if error 3")
             }
           case x => println(x); throw new Error("if error 2")
@@ -505,6 +513,11 @@ VmWriter.writeLable(s"IF_END$cur"), ks)
     (res1 + res2, left2)
   }
 
+  def stringProcess(src: String): String = {
+    val x = src.drop(1).dropRight(1)
+    VmWriter.writePush(VmWriter.Constant, x.length) + VmWriter.writeCall("String.new", 1) + (for (one <- x) yield { VmWriter.writePush(VmWriter.Constant, one.toInt) + VmWriter.writeCall("String.appendChar", 2) }).mkString
+  }
+
   def compileTerm(str: List[String], start: Boolean = false): (String, List[String]) = {
     str match {
       case x :: xs =>
@@ -512,7 +525,7 @@ VmWriter.writeLable(s"IF_END$cur"), ks)
           case JackTokennizer.IntegerConstant =>
             (VmWriter.writePush(VmWriter.Constant, x.toInt), xs)
           case JackTokennizer.StringConstant =>
-            (/**help(x)*/ "", xs)
+            (stringProcess(x), xs)
           case JackTokennizer.Keyword =>
             (VmWriter.writeKeyWord(x), xs)
           case JackTokennizer.Identifier =>
@@ -521,7 +534,7 @@ VmWriter.writeLable(s"IF_END$cur"), ks)
                 val (res1, left1) = compileExpression(ys)
                 left1 match {
                   case "]" :: zs =>
-                    (/**help(x) + help("[") + res1 + help("]")*/ "", zs)
+                    ( /**help(x) + help("[") + res1 + help("]")*/ "", zs)
                   case x => println(x); throw new Error("term error")
                 }
               case "." :: ys =>
@@ -568,7 +581,7 @@ VmWriter.writeLable(s"IF_END$cur"), ks)
         val (res1, i, left1) = compileExpressionList(xs)
         left1 match {
           case ")" :: ys =>
-            (/*help(n) + help("(") + res1 + help(")") + "</subroutineCall>\n"*/"", ys)
+            ( /*help(n) + help("(") + res1 + help(")") + "</subroutineCall>\n"*/ "", ys)
           case x => println(x); throw new Error("subroutine call error 3")
         }
       case x => println(x); throw new Error("subroutine call error")
@@ -579,7 +592,7 @@ VmWriter.writeLable(s"IF_END$cur"), ks)
     str match {
       case "," :: xs =>
         val (res1, left1) = compileExpression(xs)
-        val (res2, ni, left2) = exComma(left1, i+1)
+        val (res2, ni, left2) = exComma(left1, i + 1)
         (res1 + res2, ni, left2)
       case x => ("", i, x)
     }
@@ -590,7 +603,7 @@ VmWriter.writeLable(s"IF_END$cur"), ks)
       case Nil => ("", i, Nil)
       case x =>
         val (res1, left1) = compileExpression(x)
-        val (res2, ni, left2) = if (res1 != "") exComma(left1, i+1) else exComma(left1, 0)
+        val (res2, ni, left2) = if (res1 != "") exComma(left1, i + 1) else exComma(left1, 0)
         (res1 + res2, ni, left2)
     }
   }
@@ -611,7 +624,7 @@ object SymbolTable {
     subroutineTable.clear()
   }
 
-   def startClass(): Unit = {
+  def startClass(): Unit = {
     classTable.clear()
   }
 
@@ -633,17 +646,20 @@ object SymbolTable {
 
   def kindOf(name: String): Option[Kind] = {
     classTable.get(name).map { case (_, k, _) => k }.orElse(
-       subroutineTable.get(name).map { case (_, k, _) => k })
+      subroutineTable.get(name).map { case (_, k, _) => k }
+    )
   }
 
   def typeOf(name: String): Option[String] = {
     classTable.get(name).map { case (t, _, _) => t }.orElse(
-       subroutineTable.get(name).map { case (t, _, _) => t })
+      subroutineTable.get(name).map { case (t, _, _) => t }
+    )
   }
 
-   def indexOf(name: String): Option[Int] = {
+  def indexOf(name: String): Option[Int] = {
     classTable.get(name).map { case (_, _, i) => i }.orElse(
-       subroutineTable.get(name).map { case (_, _, i) => i })
+      subroutineTable.get(name).map { case (_, _, i) => i }
+    )
   }
 }
 
@@ -716,9 +732,9 @@ object VmWriter {
 
   def writeKeyWord(command: String): String = {
     command match {
-      case "true" => 
+      case "true" =>
         writePush(Constant, 0) +
-        "not\n"
+          "not\n"
       case "false" =>
         writePush(Constant, 0)
       case "this" =>
