@@ -227,6 +227,8 @@ object CompilationEngine {
     }
   }
 
+  var fieldCount = 0
+
   def compileClassVarDec(str: List[String]): (String, List[String]) = {
     str match {
       case "static" :: x :: y :: xs =>
@@ -236,9 +238,11 @@ object CompilationEngine {
         (VmWriter.writePush(VmWriter.Static,SymbolTable.indexOf(x).get) + c + res, left1)
       case "field" :: x :: y :: xs =>
         SymbolTable.define(y, x, SymbolTable.Field)
-        val (c, _, left) = commaProcess(xs, x, SymbolTable.Field, VmWriter.Local)
+        fieldCount += 1
+        val (c, i, left) = commaProcess(xs, x, SymbolTable.Field, VmWriter.Local)
+        fieldCount += i
         val (res, left1) = compileClassVarDec(left)
-        (VmWriter.writePush(VmWriter.Local,SymbolTable.indexOf(x).get) + c + res, left1)
+        (res, left1)
       case x => ("", x)
     }
   }
@@ -252,8 +256,15 @@ object CompilationEngine {
         left1 match {
           case ")" :: ys =>
             val (res2, i, left2) = compileSubroutineBody(ys)
+            val prefix = x match {
+              case "constructor" =>
+                VmWriter.writePush(VmWriter.Constant, fieldCount) + VmWriter.writeCall("Memory.alloc", 1) + VmWriter.writePop(VmWriter.Pointer, 0)
+              case "method" =>
+                VmWriter.writePush(VmWriter.Argument, 0) + VmWriter.writePop(VmWriter.Pointer, 0)
+              case _ => ""
+            }
             val (res3, left3) = compileSubroutine(left2)
-            (VmWriter.writeFunction(className + "." + n, i) + res1 + res2 + res3, left3)
+            (VmWriter.writeFunction(className + "." + n, i) + res1 + prefix + res2 + res3, left3)
           case x => println(x); throw new Error("subroutine error")
         }
       case x => ("", x)
@@ -341,7 +352,7 @@ object CompilationEngine {
         left1 match {
           case ")" :: ";" :: ys =>
             (res1 + (if(n1.head.isUpper) VmWriter.writeCall(n1 + "." + n2, i) else
-              VmWriter.writePush(kind2seg(SymbolTable.kindOf(n1).get),SymbolTable.indexOf(n1).get) + VmWriter.writeCall(SymbolTable.typeOf(n1).get + "." + n2, i+1)) +
+              writePushN(n1) + VmWriter.writeCall(SymbolTable.typeOf(n1).get + "." + n2, i+1)) +
               VmWriter.writePop(VmWriter.Temp, 0), ys)
           case x => println(x); throw new Error("do error 1")
         }
@@ -349,7 +360,7 @@ object CompilationEngine {
         val (res1, i, left1) = compileExpressionList(xs)
         left1 match {
           case ")" :: ";" :: ys =>
-            (res1 + VmWriter.writeCall(n, i) + 
+            (res1 + VmWriter.writePush(VmWriter.Pointer, 0) + VmWriter.writeCall(className + "." + n , i+1) +
               VmWriter.writePop(VmWriter.Temp, 0), ys)
           case x => println(x); throw new Error("do error 2")
         }
@@ -388,10 +399,14 @@ object CompilationEngine {
   def kind2seg(kind: SymbolTable.Kind): VmWriter.Segment = {
     kind match {
       case SymbolTable.Static => VmWriter.Static
-      case SymbolTable.Field => VmWriter.Local
+      case SymbolTable.Field => VmWriter.This
       case SymbolTable.Arg => VmWriter.Argument
       case SymbolTable.Var => VmWriter.Local
     }
+  }
+
+  def writePushN(n: String): String = {
+    VmWriter.writePush(kind2seg(SymbolTable.kindOf(n).get),SymbolTable.indexOf(n).get)
   }
 
   def not(): String = {
@@ -450,8 +465,8 @@ VmWriter.writeLable(s"IF_END$cur"), ks)
                   case x => println(x); throw new Error("if error 4")
                 }
               case "}" :: zs =>
-                (res1 + not() + VmWriter.writeIf(s"IF_FALSE$cur") + res2 +
-                      VmWriter.writeLable(s"IF_TRUE$cur"), zs)
+                (res1 + VmWriter.writeIf(s"IF_TRUE$cur") + VmWriter.writeGoto(s"IF_FALSE$cur") + VmWriter.writeLable(s"IF_TRUE$cur") + res2 +
+                      VmWriter.writeLable(s"IF_FALSE$cur"), zs)
               case x => println(x); throw new Error("if error 3")
             }
           case x => println(x); throw new Error("if error 2")
@@ -689,6 +704,8 @@ object VmWriter {
         "not\n"
       case "false" =>
         writePush(Constant, 0)
+      case "this" =>
+        writePush(Pointer, 0)
       case _ =>
         println("ignore keyword" + command)
         ""
