@@ -50,10 +50,9 @@ push local 1
 lt
 not
 if-goto WHILE_END0
-push local 0
 push local 2
+push local 0
 add
-pop pointer 1
 push constant 23
 call String.new 1
 push constant 69
@@ -103,6 +102,9 @@ call String.appendChar 2
 push constant 32
 call String.appendChar 2
 call Keyboard.readInt 1
+pop temp 0
+pop pointer 1
+push temp 0
 pop that 0
 push local 2
 push constant 1
@@ -121,6 +123,11 @@ lt
 not
 if-goto WHILE_END1
 push local 3
+push local 2
+push local 0
+add
+pop pointer 1
+push that 0
 add
 pop local 3
 push local 2

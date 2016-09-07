@@ -73,7 +73,6 @@ object JackTokennizer {
             (acc, strCon ++ List(x))
 
       }._1)
-    println(res)
     res
   }
 
@@ -228,8 +227,8 @@ object CompilationEngine {
   def commaProcess(s: List[String], t: String, k: SymbolTable.Kind, seg: VmWriter.Segment, i: Int = 0): (String, Int, List[String]) = {
     s match {
       case "," :: x :: xs =>
-        val (ns, j, nl) = commaProcess(xs, t, k, seg, i)
         SymbolTable.define(x, t, k)
+        val (ns, j, nl) = commaProcess(xs, t, k, seg, i)
         (ns, j + 1, nl)
       case ";" :: xs =>
         ("", i, xs)
@@ -262,17 +261,19 @@ object CompilationEngine {
     SymbolTable.startSubroutine()
     str match {
       case x :: t :: n :: "(" :: xs if set.contains(x) =>
+        val prefix = x match {
+          case "constructor" =>
+            VmWriter.writePush(VmWriter.Constant, fieldCount) + VmWriter.writeCall("Memory.alloc", 1) + VmWriter.writePop(VmWriter.Pointer, 0)
+          case "method" =>
+            SymbolTable.define("this", "", SymbolTable.Arg)
+            VmWriter.writePush(VmWriter.Argument, 0) + VmWriter.writePop(VmWriter.Pointer, 0)
+          case _ => ""
+        }
+
         val (res1, left1) = compileParameterList(xs)
         left1 match {
           case ")" :: ys =>
             val (res2, i, left2) = compileSubroutineBody(ys)
-            val prefix = x match {
-              case "constructor" =>
-                VmWriter.writePush(VmWriter.Constant, fieldCount) + VmWriter.writeCall("Memory.alloc", 1) + VmWriter.writePop(VmWriter.Pointer, 0)
-              case "method" =>
-                VmWriter.writePush(VmWriter.Argument, 0) + VmWriter.writePop(VmWriter.Pointer, 0)
-              case _ => ""
-            }
             val (res3, left3) = compileSubroutine(left2)
             (VmWriter.writeFunction(className + "." + n, i) + res1 + prefix + res2 + res3, left3)
           case x => println(x); throw new Error("subroutine error")
@@ -396,7 +397,7 @@ object CompilationEngine {
             val (res2, left2) = compileExpression(ys)
             left2 match {
               case ";" :: zs =>
-                (writePushN(n) + res1 + VmWriter.writeArithmetic("+") + VmWriter.writePop(VmWriter.Pointer, 1) + res2 + VmWriter.writePop(VmWriter.That, 0), zs)
+                (res1 + writePushN(n) + VmWriter.writeArithmetic("+") + res2 + VmWriter.writePop(VmWriter.Temp, 0) + VmWriter.writePop(VmWriter.Pointer, 1) + VmWriter.writePush(VmWriter.Temp, 0) + VmWriter.writePop(VmWriter.That, 0), zs)
               case x => println(x); throw new Error("let error 4")
             }
           case x => println(x); throw new Error("let error 3")
@@ -534,13 +535,14 @@ object CompilationEngine {
                 val (res1, left1) = compileExpression(ys)
                 left1 match {
                   case "]" :: zs =>
-                    ( /**help(x) + help("[") + res1 + help("]")*/ "", zs)
+                    (res1 + writePushN(x) + VmWriter.writeArithmetic("+") +
+                      VmWriter.writePop(VmWriter.Pointer, 1) + VmWriter.writePush(VmWriter.That, 0), zs)
                   case x => println(x); throw new Error("term error")
                 }
               case "." :: ys =>
                 compileSubroutineCall(str)
               case _ =>
-                (VmWriter.writePush(kind2seg(SymbolTable.kindOf(x).get), SymbolTable.indexOf(x).get), xs)
+                (writePushN(x), xs)
             }
           case JackTokennizer.Symbol =>
             str match {
@@ -701,6 +703,7 @@ object VmWriter {
       case "=" => "eq"
       case "&" => "and"
       case "neg" => "neg"
+      case "|" => "or"
       case _ => throw new Error("unkown arithemetic: " + command)
     }
     x + "\n"
