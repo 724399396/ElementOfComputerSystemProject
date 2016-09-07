@@ -214,6 +214,7 @@ object CompilationEngine {
         fieldCount = 0
         SymbolTable.startClass()
         val (res1, left1) = compileClassVarDec(xs)
+        println(SymbolTable.classTable)
         val (res2, left2) = compileSubroutine(left1)
         left2 match {
           case "}" :: left =>
@@ -241,10 +242,10 @@ object CompilationEngine {
   def compileClassVarDec(str: List[String]): (String, List[String]) = {
     str match {
       case "static" :: x :: y :: xs =>
-        SymbolTable.define(className + "." + y, x, SymbolTable.Static)
+        SymbolTable.define(y, x, SymbolTable.Static)
         val (c, _, left) = commaProcess(xs, x, SymbolTable.Static, VmWriter.Static)
         val (res, left1) = compileClassVarDec(left)
-        (VmWriter.writePush(VmWriter.Static, SymbolTable.indexOf(x).get) + c + res, left1)
+        (c + res, left1)
       case "field" :: x :: y :: xs =>
         SymbolTable.define(y, x, SymbolTable.Field)
         fieldCount += 1
@@ -369,8 +370,8 @@ object CompilationEngine {
         val (res1, i, left1) = compileExpressionList(xs)
         left1 match {
           case ")" :: ";" :: ys =>
-            (res1 + (if (n1.head.isUpper) VmWriter.writeCall(n1 + "." + n2, i) else
-              writePushN(n1) + VmWriter.writeCall(SymbolTable.typeOf(n1).get + "." + n2, i + 1)) +
+            ((if (n1.head.isUpper) res1 + VmWriter.writeCall(n1 + "." + n2, i) else
+               writePushN(n1) + res1 + VmWriter.writeCall(SymbolTable.typeOf(n1).get + "." + n2, i + 1)) +
               VmWriter.writePop(VmWriter.Temp, 0), ys)
           case x => println(x); throw new Error("do error 1")
         }
@@ -378,7 +379,7 @@ object CompilationEngine {
         val (res1, i, left1) = compileExpressionList(xs)
         left1 match {
           case ")" :: ";" :: ys =>
-            (res1 + VmWriter.writePush(VmWriter.Pointer, 0) + VmWriter.writeCall(className + "." + n, i + 1) +
+            (VmWriter.writePush(VmWriter.Pointer, 0) + res1 + VmWriter.writeCall(className + "." + n, i + 1) +
               VmWriter.writePop(VmWriter.Temp, 0), ys)
           case x => println(x); throw new Error("do error 2")
         }
@@ -576,7 +577,7 @@ object CompilationEngine {
         val (res1, i, left1) = compileExpressionList(xs)
         left1 match {
           case ")" :: ys =>
-            (res1 + VmWriter.writeCall(n1 + "." + n2, i), ys)
+            (if (n1.head.isUpper) res1 + VmWriter.writeCall(n1 + "." + n2, i) else  writePushN(n1) + res1 + VmWriter.writeCall(SymbolTable.typeOf(n1).get + "." + n2, i + 1), ys)
           case x => println(x); throw new Error("subroutine call error 2")
         }
       case n :: "(" :: xs =>
@@ -618,7 +619,7 @@ object SymbolTable {
   case object Arg extends Kind
   case object Var extends Kind
 
-  import scala.collection.mutable.{Map => MutableMap}
+  import scala.collection.mutable.{LinkedHashMap => MutableMap}
   val classTable = MutableMap[String, (String, Kind, Int)]()
   val subroutineTable = MutableMap[String, (String, Kind, Int)]()
 
