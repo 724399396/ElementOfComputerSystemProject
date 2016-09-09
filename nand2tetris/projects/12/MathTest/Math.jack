@@ -36,10 +36,10 @@ class Math {
     function int multiply(int ax, int ay) {
       var int sum, shiftedX, j, x, y, sig;
       let sum = 0;
-      let shiftedX = x;
       let j = 0;
       let x = Math.abs(ax);
       let y = Math.abs(ay);
+      let shiftedX = x;
       let sig = Math.sig(ax,ay);
       while (j < 16) {
         if (Math.bit(y, j)) {
@@ -86,7 +86,7 @@ class Math {
       let y = 0;
       let n = 7;
       while (~(n < 0)) {
-        let tmp2 = y + Math.pow(n);
+        let tmp2 = y + twoToThe[n];
         let tmp = Math.multiply(tmp2,tmp2);
         if (~(tmp > x)) {
           if (tmp > 0) {
@@ -119,17 +119,7 @@ class Math {
     function boolean bit(int x, int j) {
       return (x | twoToThe[j]) = x;
     }
-
-    function int pow(int j) {
-      var int res;
-      let res = 1;
-      while(j > 0) {
-        let res = res + res;
-        let j = j - 1;
-      }
-      return res;
-    }
-
+ 
     function boolean sig(int x, int y) {
       if (x > 0) {
         if (y > 0) {

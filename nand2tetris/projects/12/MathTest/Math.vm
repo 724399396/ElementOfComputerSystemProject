@@ -50,8 +50,6 @@ label IF_END0
 function Math.multiply 6
 push constant 0
 pop local 0
-push local 3
-pop local 1
 push constant 0
 pop local 2
 push argument 0
@@ -60,6 +58,8 @@ pop local 3
 push argument 1
 call Math.abs 1
 pop local 4
+push local 3
+pop local 1
 push argument 0
 push argument 1
 call Math.sig 2
@@ -186,7 +186,10 @@ not
 if-goto WHILE_END0
 push local 0
 push local 1
-call Math.pow 1
+push static 0
+add
+pop pointer 1
+push that 0
 add
 pop local 3
 push local 3
@@ -256,27 +259,6 @@ push that 0
 or
 push argument 0
 eq
-return
-function Math.pow 1
-push constant 1
-pop local 0
-label WHILE_EXP0
-push argument 0
-push constant 0
-gt
-not
-if-goto WHILE_END0
-push local 0
-push local 0
-add
-pop local 0
-push argument 0
-push constant 1
-sub
-pop argument 0
-goto WHILE_EXP0
-label WHILE_END0
-push local 0
 return
 function Math.sig 0
 push argument 0

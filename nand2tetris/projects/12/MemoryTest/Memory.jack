@@ -7,26 +7,65 @@
  * Memory operations library.
  */ 
 class Memory {
+    static int head;
 
     /** Initializes memory parameters. */
     function void init() {
+      let head = 2048;
+      do Memory.poke(head+1, 16383-2018+1);
+      do Memory.poke(head+2, 0);
+      return;
     }
 
     /** Returns the value of the main memory at the given address. */
     function int peek(int address) {
+      var Array a;
+      let a = address;
+      return a[0];
     }
 
     /** Sets the value of the main memory at this address
      *  to the given value. */
     function void poke(int address, int value) {
+      var Array a;
+      let a = address;
+      let a[0] = value;
+      return; 
     }
 
-    /** finds and allocates from the heap a memory block of the 
+    /** finds and allocates from the heap a memory block of the 2048-16383
      *  specified size and returns a reference to its base address. */
     function int alloc(int size) {
+      var int list, ll;
+      var int off;
+      let list = head;
+      while (~(list = 0)) {
+        let ll = Memory.peek(list+1);
+        if (ll > size) {
+          let off = ll - size;
+          do Memory.poke(list + off - 1, size+1);
+          do Memory.poke(list+1, ll - size - 1);
+          return list + off;
+        } else {
+          let list = Memory.peek(list+2);
+        }
+      }
+      do Sys.error(20);
+      return 0;      
     }
 
     /** De-allocates the given object and frees its space. */
     function void deAlloc(int object) {
+       var int list,newList,pre;
+       let newList = object-1;
+       do Memory.poke(object, Memory.peek(object-1));
+       do Memory.poke(object+1, 0);
+       let list = head;
+       while (~(list = 0)) {
+         let pre = list;
+         let list = Memory.peek(list+2);
+       }
+       do Memory.poke(pre+2, newList);
+       return;
     }    
 }
