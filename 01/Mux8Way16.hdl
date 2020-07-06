@@ -19,4 +19,17 @@ CHIP Mux8Way16 {
 
     PARTS:
     // Put your code here:
+    // Put your code here:
+    Not(in=sel[2],out=notSel);
+
+    Mux4Way16(a=a,b=b,c=c,d=d,sel=sel[0..1],out=out1);
+    Mux4Way16(a=e,b=f,c=g,d=h,sel=sel[0..1],out=out2);
+
+
+    Mux16(a = false, b = true, sel=notSel, out=ens);
+    Mux16(a = false, b = true, sel=sel[2], out=es);
+
+    And16(a=out1, b=ens, out=tmp1);
+    And16(a=out2, b=es, out=tmp2);
+    Or16(a=tmp1, b=tmp2, out=out);
 }
