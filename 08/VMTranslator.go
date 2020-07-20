@@ -27,20 +27,22 @@ var binaryOps = map[string]string{"add": "D=M+D", "sub": "D=M-D", "and": "D=D&M"
 var unaryOps = map[string]string{"neg": "D=-M", "not": "D=!M"}
 var segmentLoc = map[string][]string{"local": []string{"@LCL", "A=M"}, "argument": []string{"@ARG", "A=M"},
 	"this": []string{"@THIS", "A=M"}, "that": []string{"@THAT", "A=M"},
-	"static": []string{"@16"}, "temp": []string{"@5"}}
+	"temp": []string{"@5"}}
 
 var funcCallCount = map[string]int{}
 
 var compare_label_i = 0
+var return_label_i = 0
 
 type command struct {
 	cType commandType
 	arg1  string
 	arg2  string
 	src   string
+	fileName string
 }
 
-func readLines(inFile string) []string {
+func readLines(inFile string) []*command {
 	dat, err := ioutil.ReadFile(inFile)
 	if err != nil {
 		panic(err)
@@ -59,49 +61,53 @@ func readLines(inFile string) []string {
 			i++
 		}
 	}
-	return lines[:i]
+	cmds := make([]*command, i)
+	for i, line := range lines[:i] {
+		cmds[i] = parse(line, inFile[strings.LastIndex(inFile, "/") + 1:])
+	}
+	return cmds
 }
 
-func parse(line string) *command {
+func parse(line string, fileName string) *command {
 	if _, ok := binaryOps[line]; ok {
-		return &command{cArithmetic, line, "", line}
+		return &command{cArithmetic, line, "", line, fileName}
 	}
 	if _, ok := compareOps[line]; ok {
-		return &command{cArithmetic, line, "", line}
+		return &command{cArithmetic, line, "", line, fileName}
 	}
 	if _, ok := unaryOps[line]; ok {
-		return &command{cArithmetic, line, "", line}
+		return &command{cArithmetic, line, "", line, fileName}
 	}
 	if strings.HasPrefix(line, "push") {
 		splits := strings.Split(line, " ")
-		return &command{cPush, splits[1], splits[2], line}
+		return &command{cPush, splits[1], splits[2], line, fileName}
 	}
 	if strings.HasPrefix(line, "pop") {
 		splits := strings.Split(line, " ")
-		return &command{cPop, splits[1], splits[2], line}
+		return &command{cPop, splits[1], splits[2], line, fileName}
 	}
 	if strings.HasPrefix(line, "label") {
 		splits := strings.Split(line, " ")
-		return &command{cLabel, splits[1], "", line}
+		return &command{cLabel, splits[1], "", line, fileName}
 	}
 	if strings.HasPrefix(line, "goto") {
 		splits := strings.Split(line, " ")
-		return &command{cGoTo, splits[1], "", line}
+		return &command{cGoTo, splits[1], "", line, fileName}
 	}
 	if strings.HasPrefix(line, "if-goto") {
 		splits := strings.Split(line, " ")
-		return &command{cIfGoTo, splits[1], "", line}
+		return &command{cIfGoTo, splits[1], "", line, fileName}
 	}
 	if strings.HasPrefix(line, "function") {
 		splits := strings.Split(line, " ")
-		return &command{cFunc, splits[1], splits[2], line}
+		return &command{cFunc, splits[1], splits[2], line, fileName}
 	}
 	if strings.HasPrefix(line, "call") {
 		splits := strings.Split(line, " ")
-		return &command{cCall, splits[1], splits[2], line}
+		return &command{cCall, splits[1], splits[2], line, fileName}
 	}
 	if strings.HasPrefix(line, "return") {
-		return &command{cReturn, "", "", line}
+		return &command{cReturn, "", "", line, fileName}
 	}
 	panic("not support command" + line)
 }
@@ -175,6 +181,11 @@ func asmCode(cmd *command) []string {
 					"D=M",
 				}
 			}
+		} else if cmd.arg1 == "static" {
+			codes = []string{
+				"@static." + cmd.fileName + "." + cmd.arg2,
+				"D=M",
+			}
 		} else {
 			loc := segmentLoc[cmd.arg1]
 			n, _ := strconv.Atoi(cmd.arg2)
@@ -204,6 +215,11 @@ func asmCode(cmd *command) []string {
 					"@THAT",
 					"M=D",
 				}
+			}
+		} else if cmd.arg1 == "static" {
+			codes = []string{
+				"@static." + cmd.fileName + "." + cmd.arg2,
+				"M=D",
 			}
 		} else {
 			loc := segmentLoc[cmd.arg1]
@@ -255,14 +271,15 @@ func asmCode(cmd *command) []string {
 		}
 		return res
 	case cReturn:
+		return_label_i++
 		return []string{
-			// save return address to @R5
+			// save return address to assembly temp value
 			"@LCL",
 			"D=M",
 			"@5",
 			"A=D-A",
 			"D=M",
-			"@R5",
+			"@ret." + strconv.Itoa(return_label_i),
 			"M=D",
 
 			// save return value to current arg point to
@@ -311,7 +328,7 @@ func asmCode(cmd *command) []string {
 			"@LCL",
 			"M=D",
 
-			"@5",
+			"@ret." + strconv.Itoa(return_label_i),
 			"A=M",
 			"0;JMP",
 		}
@@ -392,38 +409,29 @@ func main() {
 		panic(err)
 	}
 	var f *os.File
-	var lines []string
+	var cmds []*command
 	switch mode := fi.Mode(); {
 	case mode.IsDir():
 		outFile := target + "/" + target[strings.LastIndex(target, "/"):] + ".asm"
 		f, _ = os.OpenFile(outFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 		defer f.Close()
-		fmt.Fprintln(f, "@256")
-		fmt.Fprintln(f, "D=A")
-		fmt.Fprintln(f, "@R0")
-		fmt.Fprintln(f, "M=D")
 		fmt.Fprintln(f, "@Sys.init")
 		fmt.Fprintln(f, "0;JMP")
 		files, err := ioutil.ReadDir(target)
 		if err != nil {
 			panic(err)
 		}
-		lines = []string{}
+		cmds = []*command{}
 		for _, f := range files {
 			if strings.HasSuffix(f.Name(), ".vm") {
-				lines = append(lines, readLines(target+"/"+f.Name())...)
+				cmds = append(cmds, readLines(target+"/"+f.Name())...)
 			}
 		}
 	case mode.IsRegular():
 		outFile := target[:strings.LastIndex(target, ".")] + ".asm"
 		f, _ = os.OpenFile(outFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 		defer f.Close()
-		lines = readLines(target)
-	}
-
-	cmds := make([]*command, len(lines))
-	for i, line := range lines {
-		cmds[i] = parse(line)
+		cmds = readLines(target)
 	}
 
 	if err != nil {
