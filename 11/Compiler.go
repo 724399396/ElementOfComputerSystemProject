@@ -52,7 +52,7 @@ type keywords []string
 
 var allSymbols = map[byte]string{'{': "{", '}': "}", '(': "(", ')': ")", '[': "[", ']': "]", '.': ".", ',': ",", ';': ";", '+': "+", '-': "-",
 	'*': "*", '/': "/", '&': "&amp;", '|': "|", '<': "&lt;", '>': "&gt;", '=': "=", '~': "~"}
-var opSymbols = map[string]string{"+": "add", "-": "sub", "*": "call Math.multiply 2", "/": "call Math.divide", "&amp;": "and", "|": "or", "&lt;": "lt", "&gt;": "gt", "=": "eq"}
+var opSymbols = map[string]string{"+": "add", "-": "sub", "*": "call Math.multiply 2", "/": "call Math.divide 2", "&amp;": "and", "|": "or", "&lt;": "lt", "&gt;": "gt", "=": "eq"}
 var allKeywords = keywords{"class", "constructor", "function", "method", "field", "static",
 	"var", "int", "char", "boolean", "void", "true", "false", "null", "this", "let", "do",
 	"if", "else", "while", "return"}
@@ -392,16 +392,16 @@ func compileLetStatement(tokens []*token, f *os.File) []*token {
 		tokens = compileExpression(tokens, f)
 		tokens = eat(tokens, symbol, "]")
 		isArray = true
-		fmt.Fprintln(f, "add\n")
+		fmt.Fprintln(f, "add")
 	}
 	tokens = eat(tokens, symbol, "=")
 	tokens = compileExpression(tokens, f)
 	tokens = eat(tokens, symbol, ";")
 	if isArray {
-		fmt.Fprintln(f, "pop temp 0\n")
-		fmt.Fprintln(f, "pop pointer 1\n")
-		fmt.Fprintln(f, "push temp 0\n")
-		fmt.Fprintln(f, "pop that 0\n")
+		fmt.Fprintln(f, "pop temp 0")
+		fmt.Fprintln(f, "pop pointer 1")
+		fmt.Fprintln(f, "push temp 0")
+		fmt.Fprintln(f, "pop that 0")
 	} else {
 		fmt.Fprintf(f, "pop %s %d\n", targetSymbol.sType, targetSymbol.index)
 	}
@@ -423,8 +423,8 @@ func compileIfStatement(tokens []*token, f *os.File) []*token {
 	tokens = compileStatements(tokens, f)
 	tokens = eat(tokens, symbol, "}")
 	fmt.Fprintf(f, "goto IF_END%d\n", label)
+	fmt.Fprintf(f, "label IF_FALSE%d\n", label)
 	if tokens[0].val == "else" {
-		fmt.Fprintf(f, "label IF_FALSE%d\n", label)
 		tokens = eat(tokens, keyword, "else")
 		tokens = eat(tokens, symbol, "{")
 		tokens = compileStatements(tokens, f)
@@ -491,7 +491,7 @@ func compileExpression(tokens []*token, f *os.File) []*token {
 func compileTerm(tokens []*token, f *os.File) []*token {
 	if tokens[0].tType == identifier && tokens[1].val == "[" {
 		targetSymbol := findSymbol(tokens[0].val)
-		fmt.Fprintf(f, "push %s %d", targetSymbol.sType, targetSymbol.index)
+		fmt.Fprintf(f, "push %s %d\n", targetSymbol.sType, targetSymbol.index)
 		tokens = eat(tokens, "", "")
 		tokens = eat(tokens, symbol, "[")
 		tokens = compileExpression(tokens, f)
@@ -526,9 +526,11 @@ func compileTerm(tokens []*token, f *os.File) []*token {
 		return tokens
 	}
 	if tokens[0].tType == stringConstant {
-		fmt.Fprintf(f, "call String.new %d\n", len(tokens[0].val))
+		fmt.Fprintf(f, "push constant %d\n", len(tokens[0].val))
+		fmt.Fprintln(f, "call String.new 1")
 		for _, val := range tokens[0].val {
-			fmt.Fprintf(f, "call String.append %d\n", val)
+			fmt.Fprintf(f, "push constant %d\n", val)
+			fmt.Fprintln(f, "call String.appendChar 2")
 		}
 		tokens = eat(tokens, "", "")
 		return tokens
@@ -545,8 +547,9 @@ func compileTerm(tokens []*token, f *os.File) []*token {
 		} else if tokens[0].val == "false" {
 			fmt.Fprintln(f, "push constant 0")
 		} else if tokens[0].val == "this" {
-			// TODO
 			fmt.Fprintln(f, "push pointer 0")
+		} else if tokens[0].val == "null" {
+			fmt.Fprintln(f, "push constant 0")
 		} else {
 			panic("not match keyword literal" + tokens[0].val)
 		}
@@ -579,7 +582,6 @@ func compileSubroutineCall(tokens []*token, f *os.File) []*token {
 		tokens = compileExpressionList(tokens, f)
 		tokens = eat(tokens, symbol, ")")
 		if obj != nil {
-			currentClassName = obj.fType
 			fmt.Fprintf(f, "call %s.%s %d\n", obj.fType, funcName, callArgumentNum+1)
 		} else {
 			fmt.Fprintf(f, "call %s.%s %d\n", objOrClass, funcName, callArgumentNum)
@@ -642,7 +644,7 @@ func main() {
 	for _, filePath := range filePaths {
 		tokens := readLines(filePath)
 
-		parserF, _ := os.OpenFile(filePath[:strings.LastIndex(filePath, ".")]+".my.vm", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+		parserF, _ := os.OpenFile(filePath[:strings.LastIndex(filePath, ".")]+".vm", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 		defer parserF.Close()
 		parser(tokens, parserF)
 	}
