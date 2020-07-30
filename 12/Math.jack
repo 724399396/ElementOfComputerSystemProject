@@ -70,7 +70,7 @@ class Math {
      *  the Jack expressions x/y and divide(x,y) return the same value.
      */
     function int divide(int x, int y) {
-        var int q, tmp;
+        var int q, tmp, p;
         if (x < 0 & y < 0) {
             return Math.divide(Math.abs(x), Math.abs(y));
         }
@@ -80,7 +80,12 @@ class Math {
         if (y > x) {
             return 0;
         }
-        let q = Math.divide(x, y+y);
+        let p = y + y;
+        if (p < 0) {
+            let q = 0;
+        } else {
+            let q = Math.divide(x, p);
+        }
         let tmp = Math.multiply(q, y);
         if ((x - (tmp + tmp)) < y) {
            return q + q;
